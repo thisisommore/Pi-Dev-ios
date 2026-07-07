@@ -11,7 +11,7 @@
 
 import SwiftUI
 internal import UniformTypeIdentifiers
-
+let appColor = Color.blue
 // MARK: - ── Domain (fake) ─────────────────────────────────────────────────────
 
 enum AIModel: String, CaseIterable, Identifiable {
@@ -561,7 +561,7 @@ private struct Sidebar: View {
             Color(.systemBackground)
                 .ignoresSafeArea()
             LinearGradient(
-                colors: [.purple.opacity(0.08), .clear, .teal.opacity(0.06)],
+                colors: [appColor.opacity(0.08), .clear, .teal.opacity(0.06)],
                 startPoint: .topLeading, endPoint: .bottomTrailing
             )
             .ignoresSafeArea()
@@ -664,11 +664,11 @@ private struct Background: View {
         ZStack {
             Color(.systemBackground)
             LinearGradient(
-                colors: [.purple.opacity(0.16), .clear, .teal.opacity(0.12)],
+                colors: [appColor.opacity(0.16), .clear, .teal.opacity(0.12)],
                 startPoint: .topLeading, endPoint: .bottomTrailing
             )
             Circle()
-                .fill(.purple.opacity(0.14))
+                .fill(appColor.opacity(0.14))
                 .frame(width: 380)
                 .blur(radius: 110)
                 .offset(x: -140, y: -280)
@@ -893,7 +893,7 @@ private struct UserBubble: View {
                 .padding(.vertical, 11)
                 .foregroundStyle(.white)
                 .background(
-                    Color.purple,
+                    appColor,
                     in: .rect(cornerRadius: 22)
                 )
                 .glassEffect(.clear, in: .rect(cornerRadius: 22))
