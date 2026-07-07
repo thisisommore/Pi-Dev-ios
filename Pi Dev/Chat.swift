@@ -707,17 +707,6 @@ private struct Header: View {
                 .buttonStyle(.plain)
                 .glassEffect(.regular.interactive())
 
-                // New chat
-                Button {
-                    store.newChat()
-                } label: {
-                    Image(systemName: "square.and.pencil")
-                        .font(.system(size: 17, weight: .semibold))
-                        .frame(width: 44, height: 44)
-                }
-                .buttonStyle(.plain)
-                .glassEffect(.regular.interactive())
-
                 // Title with menu on tap
                 Menu {
                     Button {
@@ -754,6 +743,17 @@ private struct Header: View {
                              window: store.model.contextWindow)
                     .frame(width: 44, height: 44)
                     .glassEffect(.regular)
+
+                // New chat
+                Button {
+                    store.newChat()
+                } label: {
+                    Image(systemName: "square.and.pencil")
+                        .font(.system(size: 17, weight: .semibold))
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .glassEffect(.regular.interactive())
             }
             .padding(.horizontal, 16)
             .padding(.top, 6)
