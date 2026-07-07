@@ -388,9 +388,9 @@ final class ChatStore: Identifiable {
             )
         }
         reply.tools = [
-            ToolUse(kind: .builtin, name: "file_search", detail: "Found SearchViewModel.swift, SearchView.swift, RepositoryClient.swift", symbol: "magnifyingglass"),
-            ToolUse(kind: .builtin, name: "file_edit", detail: "Edited SearchViewModel.swift, RepositoryClient.swift — +42 −11", symbol: "pencil.line"),
-            ToolUse(kind: .mcp, name: "github", detail: "Read repository/SearchViewModel.swift", symbol: "arrow.triangle.branch"),
+            ToolUse(kind: .builtin, name: "Search for .swift", detail: "Found SearchViewModel.swift, SearchView.swift, RepositoryClient.swift", symbol: "magnifyingglass"),
+            ToolUse(kind: .builtin, name: "Edit SearchViewModel.swift", detail: "+41 −4", symbol: "pencil.line"),
+            ToolUse(kind: .mcp, name: "Read SearchViewModel.swift", detail: "repository/SearchViewModel.swift", symbol: "arrow.triangle.branch"),
             ToolUse(kind: .skill, name: "swift-testing", detail: "Generated 2 test cases", symbol: "checkmark.seal"),
         ]
         reply.terminal = [
@@ -1078,48 +1078,57 @@ private struct ToolRow: View {
 
 private struct ToolChip: View {
     let tool: ToolUse
-    @State private var expanded = false
 
     var body: some View {
-        Button {
-            withAnimation(.snappy) { expanded.toggle() }
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: tool.symbol)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 18)
+        HStack(spacing: 8) {
+            Image(systemName: tool.symbol)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 18)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text(tool.name)
-                            .font(.caption2.weight(.semibold))
-                        Text(tool.kind.label)
-                            .font(.system(size: 8, weight: .heavy))
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(.secondary.opacity(0.15), in: .capsule)
-                    }
-                    if expanded {
-                        Text(tool.detail)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .transition(.opacity)
-                    }
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(tool.name)
+                        .font(.caption2.weight(.semibold))
+                    Text(tool.kind.label)
+                        .font(.system(size: 8, weight: .heavy))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(.secondary.opacity(0.15), in: .capsule)
                 }
-
-                Spacer(minLength: 0)
-
-                Image(systemName: expanded ? "chevron.up" : "chevron.down")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(.secondary)
+                DiffLabel(text: tool.detail)
             }
-            .foregroundStyle(.primary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(.secondary.opacity(0.08), in: .rect(cornerRadius: 12))
+
+            Spacer(minLength: 0)
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.secondary.opacity(0.08), in: .rect(cornerRadius: 12))
+    }
+}
+
+private struct DiffLabel: View {
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(parts, id: \.self) { part in
+                Text(part)
+                    .foregroundStyle(color(for: part))
+            }
+        }
+        .font(.caption2)
+    }
+
+    private var parts: [String] {
+        text.split(separator: " ", omittingEmptySubsequences: true)
+            .map(String.init)
+    }
+
+    private func color(for part: String) -> Color {
+        if part.hasPrefix("+") { return .green }
+        if part.hasPrefix("−") || part.hasPrefix("-") { return .red }
+        return .secondary
     }
 }
 
