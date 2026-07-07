@@ -420,9 +420,9 @@ struct AICodeChatView: View {
             .onTapGesture {
                 store.cancelEditIfUnchanged()
             }
-
+        }
+        .safeAreaInset(edge: .bottom) {
             VStack(alignment: .leading, spacing: 0) {
-                Spacer(minLength: 0)
                 if store.editingMessageId != nil {
                     Button {
                         store.cancelEdit()
@@ -553,35 +553,48 @@ private struct MessageList: View {
     @Bindable var store: ChatStore
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(spacing: 18) {
-                    ForEach(store.messages) { message in
-                        MessageRow(message: message, store: store)
-                            .id(message.id)
-                            .transition(.asymmetric(
-                                insertion: .move(edge: .bottom).combined(with: .opacity),
-                                removal: .opacity))
+        if store.messages.isEmpty {
+            EmptyChatView()
+        } else {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: 18) {
+                        ForEach(store.messages) { message in
+                            MessageRow(message: message, store: store)
+                                .id(message.id)
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .bottom).combined(with: .opacity),
+                                    removal: .opacity))
+                        }
+                        if store.isResponding {
+                            TypingIndicator(tint: store.model.tint)
+                                .id("typing")
+                                .transition(.opacity)
+                        }
                     }
-                    if store.isResponding {
-                        TypingIndicator(tint: store.model.tint)
-                            .id("typing")
-                            .transition(.opacity)
-                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 12)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .padding(.bottom, 12)
-            }
-            .frame(maxHeight: .infinity)
-            .scrollDismissesKeyboard(.interactively)
-            .scrollEdgeEffectStyle(.soft, for: .all)
-            .onChange(of: store.messages.count) {
-                withAnimation(.snappy) {
-                    proxy.scrollTo(store.messages.last?.id, anchor: .bottom)
+                .frame(maxHeight: .infinity)
+                .scrollDismissesKeyboard(.interactively)
+                .scrollEdgeEffectStyle(.soft, for: .all)
+                .onChange(of: store.messages.count) {
+                    withAnimation(.snappy) {
+                        proxy.scrollTo(store.messages.last?.id, anchor: .bottom)
+                    }
                 }
             }
         }
+    }
+}
+
+private struct EmptyChatView: View {
+    var body: some View {
+        Text("π")
+            .font(.system(size: 48, weight: .thin, design: .serif))
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
