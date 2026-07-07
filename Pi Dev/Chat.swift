@@ -1087,15 +1087,8 @@ private struct ToolChip: View {
                 .frame(width: 18)
 
             VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(tool.name)
-                        .font(.caption2.weight(.semibold))
-                    Text(tool.kind.label)
-                        .font(.system(size: 8, weight: .heavy))
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(.secondary.opacity(0.15), in: .capsule)
-                }
+                Text(tool.name)
+                    .font(.caption2.weight(.semibold))
                 DiffLabel(text: tool.detail)
             }
 
