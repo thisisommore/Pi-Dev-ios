@@ -1087,9 +1087,18 @@ private struct ToolChip: View {
                 .frame(width: 18)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(tool.name)
-                    .font(.caption2.weight(.semibold))
-                DiffLabel(text: tool.detail)
+                HStack(spacing: 6) {
+                    Text(tool.name)
+                        .font(.caption2.weight(.semibold))
+                    if isDiffStat(tool.detail) {
+                        DiffLabel(text: tool.detail)
+                    }
+                    Spacer(minLength: 0)
+                }
+                if !isDiffStat(tool.detail) {
+                    DiffLabel(text: tool.detail)
+                        .lineLimit(1)
+                }
             }
 
             Spacer(minLength: 0)
@@ -1098,6 +1107,11 @@ private struct ToolChip: View {
         .padding(.vertical, 8)
         .background(.secondary.opacity(0.08), in: .rect(cornerRadius: 12))
     }
+}
+
+private func isDiffStat(_ text: String) -> Bool {
+    let parts = text.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+    return parts.contains { $0.hasPrefix("+") || $0.hasPrefix("−") || $0.hasPrefix("-") }
 }
 
 private struct DiffLabel: View {
