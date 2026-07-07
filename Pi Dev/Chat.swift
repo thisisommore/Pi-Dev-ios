@@ -577,9 +577,9 @@ private struct Sidebar: View {
                         Image(systemName: "magnifyingglass")
                             .font(.system(size: 16, weight: .light))
                             .frame(width: 36, height: 36)
-                            .background(.white.opacity(0.12), in: .circle)
                     }
                     .buttonStyle(.plain)
+                    .glassEffect(.regular.interactive(), in: .circle)
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
