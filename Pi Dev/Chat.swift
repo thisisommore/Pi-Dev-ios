@@ -156,7 +156,8 @@ struct ChatMessage: Identifiable {
 // MARK: - ── Store (fake state) ─────────────────────────────────────────────────
 
 @Observable
-final class ChatStore {
+final class ChatStore: Identifiable {
+    let id = UUID()
     var messages: [ChatMessage] = []
     var model: AIModel = .fable
     var thinkingLevel: ThinkingLevel = .high
@@ -413,18 +414,88 @@ final class ChatStore {
     }
 }
 
+// MARK: - ── Sidebar store ─────────────────────────────────────────────────────
+
+@Observable
+final class SidebarStore {
+    var chats: [ChatStore] = []
+    var selectedChatId: UUID? = nil
+    var searchText = ""
+
+    init() {
+        let first = ChatStore()
+        chats = [first]
+        selectedChatId = first.id
+    }
+
+    var filteredChats: [ChatStore] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if query.isEmpty { return chats }
+        return chats.filter { $0.chatTitle.lowercased().contains(query) }
+    }
+
+    func newChat() {
+        let chat = ChatStore()
+        withAnimation(.snappy) {
+            chats.append(chat)
+            selectedChatId = chat.id
+        }
+    }
+
+    func select(chatId: UUID) {
+        withAnimation(.snappy) {
+            selectedChatId = chatId
+        }
+    }
+
+    func delete(chatId: UUID) {
+        withAnimation(.snappy) {
+            chats.removeAll { $0.id == chatId }
+            if selectedChatId == chatId {
+                selectedChatId = chats.last?.id
+            }
+        }
+    }
+}
+
 // MARK: - ── Root ──────────────────────────────────────────────────────────────
 
 struct AICodeChatView: View {
-    @State private var store = ChatStore()
+    @State private var sidebarStore = SidebarStore()
+    @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    var body: some View {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
+            Sidebar(store: sidebarStore)
+                .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 340)
+        } detail: {
+            if let selectedChat = sidebarStore.chats.first(where: { $0.id == sidebarStore.selectedChatId }) {
+                ChatDetailView(store: selectedChat, columnVisibility: $columnVisibility)
+            } else {
+                ContentUnavailableView("Select a chat", systemImage: "bubble")
+            }
+        }
+        .navigationSplitViewStyle(.balanced)
+        .onChange(of: sidebarStore.selectedChatId) { _, _ in
+            if horizontalSizeClass == .compact {
+                columnVisibility = .detailOnly
+            }
+        }
+    }
+}
+
+private struct ChatDetailView: View {
+    @Bindable var store: ChatStore
     @State private var showModelSheet = false
+    @Binding var columnVisibility: NavigationSplitViewVisibility
 
     var body: some View {
         ZStack {
             Background()
 
             VStack(spacing: 0) {
-                Header(store: store, showModelSheet: $showModelSheet)
+                Header(store: store, showModelSheet: $showModelSheet, columnVisibility: $columnVisibility)
                 MessageList(store: store)
             }
             .contentShape(.rect)
@@ -460,6 +531,112 @@ struct AICodeChatView: View {
     }
 }
 
+// MARK: - ── Sidebar ───────────────────────────────────────────────────────────
+
+private struct Sidebar: View {
+    @Bindable var store: SidebarStore
+
+    var body: some View {
+        ZStack {
+            Color(.systemBackground)
+            LinearGradient(
+                colors: [.purple.opacity(0.08), .clear, .teal.opacity(0.06)],
+                startPoint: .topLeading, endPoint: .bottomTrailing
+            )
+        }
+        .ignoresSafeArea()
+        .overlay {
+            VStack(spacing: 0) {
+                HStack {
+                    Text("Chats")
+                        .font(.title3.weight(.bold))
+                    Spacer()
+                    Button {
+                        store.newChat()
+                    } label: {
+                        Image(systemName: "square.and.pencil")
+                            .font(.system(size: 16, weight: .semibold))
+                            .frame(width: 36, height: 36)
+                            .background(.white.opacity(0.12), in: .circle)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 12)
+
+                HStack {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    TextField("Search chats…", text: $store.searchText)
+                        .font(.subheadline)
+                    if !store.searchText.isEmpty {
+                        Button {
+                            store.searchText = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 15))
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(.secondary.opacity(0.12), in: .rect(cornerRadius: 12))
+                .padding(.horizontal, 16)
+                .padding(.bottom, 12)
+
+                ScrollView {
+                    LazyVStack(spacing: 8) {
+                        ForEach(store.filteredChats) { chat in
+                            Button {
+                                store.select(chatId: chat.id)
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: "bubble.fill")
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(.secondary)
+                                    Text(chat.chatTitle)
+                                        .font(.subheadline.weight(.semibold))
+                                        .lineLimit(1)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    if store.selectedChatId == chat.id {
+                                        Circle()
+                                            .fill(.white)
+                                            .frame(width: 6, height: 6)
+                                    }
+                                }
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 10)
+                                .background(
+                                    store.selectedChatId == chat.id
+                                        ? .white.opacity(0.14)
+                                        : .clear,
+                                    in: .rect(cornerRadius: 12)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    store.delete(chatId: chat.id)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
+                }
+
+                Spacer(minLength: 0)
+            }
+        }
+    }
+}
+
 // MARK: - ── Background ────────────────────────────────────────────────────────
 
 private struct Background: View {
@@ -490,12 +667,27 @@ private struct Background: View {
 private struct Header: View {
     @Bindable var store: ChatStore
     @Binding var showModelSheet: Bool
+    @Binding var columnVisibility: NavigationSplitViewVisibility
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var showRenameAlert = false
     @State private var renameDraft = ""
 
     var body: some View {
         GlassEffectContainer(spacing: 12) {
             HStack(spacing: 12) {
+                // Sidebar toggle (iPhone / collapsed)
+                if horizontalSizeClass == .compact {
+                    Button {
+                        columnVisibility = .all
+                    } label: {
+                        Image(systemName: "line.3.horizontal")
+                            .font(.system(size: 17, weight: .semibold))
+                            .frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .glassEffect(.regular.interactive())
+                }
+
                 // New chat
                 Button {
                     store.newChat()
