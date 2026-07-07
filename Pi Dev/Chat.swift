@@ -620,14 +620,12 @@ private struct Sidebar: View {
                                 }
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 18)
-                                .background(
-                                    store.selectedChatId == chat.id
-                                        ? AnyShapeStyle(.regularMaterial)
-                                        : AnyShapeStyle(.clear),
-                                    in: .rect(cornerRadius: 12)
-                                )
                             }
                             .buttonStyle(.plain)
+                            .glassEffect(
+                                store.selectedChatId == chat.id ? .regular : .clear,
+                                in: .rect(cornerRadius: 12)
+                            )
                             .contextMenu {
                                 Button(role: .destructive) {
                                     store.delete(chatId: chat.id)
