@@ -615,9 +615,6 @@ private struct Sidebar: View {
                                 store.select(chatId: chat.id)
                             } label: {
                                 HStack(spacing: 10) {
-                                    Image(systemName: "bubble.fill")
-                                        .font(.system(size: 12))
-                                        .foregroundStyle(.secondary)
                                     Text(chat.chatTitle)
                                         .font(.subheadline.weight(.semibold))
                                         .lineLimit(1)
