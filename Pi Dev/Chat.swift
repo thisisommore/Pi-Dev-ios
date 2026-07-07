@@ -188,6 +188,17 @@ final class ChatStore {
         }
     }
 
+    func forkChat() {
+        withAnimation(.snappy) {
+            chatTitle = chatTitle + " (fork)"
+            isResponding = false
+            draft = ""
+            editingMessageId = nil
+            pastedItems = []
+            contextFiles = []
+        }
+    }
+
     func startEditing(message: ChatMessage) {
         editingMessageId = message.id
         draft = message.text
@@ -479,6 +490,8 @@ private struct Background: View {
 private struct Header: View {
     @Bindable var store: ChatStore
     @Binding var showModelSheet: Bool
+    @State private var showRenameAlert = false
+    @State private var renameDraft = ""
 
     var body: some View {
         GlassEffectContainer(spacing: 12) {
@@ -494,11 +507,33 @@ private struct Header: View {
                 .buttonStyle(.plain)
                 .glassEffect(.regular.interactive())
 
-                // Title only (no model selector button)
-                Text(store.chatTitle)
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                // Title with menu on tap
+                Menu {
+                    Button {
+                        renameDraft = store.chatTitle
+                        showRenameAlert = true
+                    } label: {
+                        Label("Edit", systemImage: "pencil")
+                    }
+                    Button {
+                        store.forkChat()
+                    } label: {
+                        Label("Fork", systemImage: "arrow.branch")
+                    }
+                } label: {
+                    HStack {
+                        Text(store.chatTitle)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                    }
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .tint(.primary)
+                .animation(nil)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 // Context gauge
                 ContextGauge(fraction: store.contextFraction,
@@ -514,6 +549,16 @@ private struct Header: View {
         .blur(radius: store.editingMessageId != nil ? 10 : 0)
         .allowsHitTesting(store.editingMessageId == nil)
         .animation(.snappy, value: store.editingMessageId != nil)
+        .alert("Rename chat", isPresented: $showRenameAlert) {
+            TextField("Chat name", text: $renameDraft)
+            Button("Cancel", role: .cancel) {}
+            Button("Save") {
+                let trimmed = renameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty {
+                    store.chatTitle = trimmed
+                }
+            }
+        }
     }
 }
 
