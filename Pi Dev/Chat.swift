@@ -467,32 +467,33 @@ struct AICodeChatView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                if let selectedChat = sidebarStore.chats.first(where: { $0.id == sidebarStore.selectedChatId }) {
-                    ChatDetailView(store: selectedChat, showSidebar: $showSidebar)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    ContentUnavailableView("Select a chat", systemImage: "bubble")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-
-                // Dim detail when sidebar is open
-                Color.black.opacity(showSidebar ? 0.25 : 0)
-                    .ignoresSafeArea()
-                    .contentShape(.rect)
-                    .onTapGesture {
-                        withAnimation(.snappy) {
-                            showSidebar = false
-                        }
-                    }
-                    .allowsHitTesting(showSidebar)
-                    .animation(.snappy, value: showSidebar)
-
-                // Slide-over sidebar: 80% width
+                // Sidebar sits underneath the detail
                 Sidebar(store: sidebarStore)
                     .frame(width: geometry.size.width * 0.8)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .offset(x: showSidebar ? 0 : -geometry.size.width * 0.8)
-                    .animation(.snappy, value: showSidebar)
+
+                // Detail + dimming slide to the right when sidebar opens
+                ZStack {
+                    if let selectedChat = sidebarStore.chats.first(where: { $0.id == sidebarStore.selectedChatId }) {
+                        ChatDetailView(store: selectedChat, showSidebar: $showSidebar)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        ContentUnavailableView("Select a chat", systemImage: "bubble")
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+
+                    Color.black.opacity(showSidebar ? 0.25 : 0)
+                        .ignoresSafeArea()
+                        .contentShape(.rect)
+                        .onTapGesture {
+                            withAnimation(.snappy) {
+                                showSidebar = false
+                            }
+                        }
+                        .allowsHitTesting(showSidebar)
+                }
+                .offset(x: showSidebar ? geometry.size.width * 0.8 : 0)
+                .animation(.snappy, value: showSidebar)
             }
             .onChange(of: sidebarStore.selectedChatId) { _, _ in
                 withAnimation(.snappy) {
