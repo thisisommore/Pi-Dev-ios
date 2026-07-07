@@ -1302,66 +1302,97 @@ private struct ModelSheet: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 8) {
             Capsule()
                 .fill(.tertiary)
                 .frame(width: 36, height: 5)
                 .frame(maxWidth: .infinity)
                 .padding(.top, 10)
 
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                TextField("Search models…", text: $searchText)
-                    .font(.subheadline)
-                if !searchText.isEmpty {
-                    Button {
-                        searchText = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 16))
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(.secondary.opacity(0.12), in: .rect(cornerRadius: 14))
-            .padding(.horizontal, 20)
+            searchBar
 
-            VStack(spacing: 0) {
-                ForEach(filteredModels) { model in
-                    Button {
-                        withAnimation(.snappy) { store.model = model }
-                        dismiss()
-                    } label: {
-                        HStack {
-                            Text(model.rawValue)
-                                .font(.subheadline.weight(.semibold))
-                            Spacer()
-                            if store.model == model {
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 14, weight: .bold))
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 14)
-                        .contentShape(.rect)
-                    }
-                    .buttonStyle(.plain)
-
-                    if model != filteredModels.last {
-                        Divider()
-                            .padding(.horizontal, 20)
-                    }
-                }
-            }
-            .padding(.top, 8)
+            ModelList(store: store, models: filteredModels)
 
             Spacer(minLength: 0)
         }
+    }
+
+    private var searchBar: some View {
+        HStack {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.secondary)
+            TextField("Search models…", text: $searchText)
+                .font(.subheadline)
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(.secondary.opacity(0.12), in: .rect(cornerRadius: 14))
+        .padding(.horizontal, 20)
+    }
+}
+
+private struct ModelList: View {
+    @Bindable var store: ChatStore
+    @Environment(\.dismiss) private var dismiss
+    let models: [AIModel]
+
+    var body: some View {
+        ScrollView(showsIndicators: false) {
+            LazyVStack(spacing: 0) {
+                ForEach(models) { model in
+                    ModelRow(store: store, model: model)
+
+                    if model != models.last {
+                        Divider()
+                            .padding(.leading, 20)
+                    }
+                }
+            }
+            .background(.secondary.opacity(0.12), in: .rect(cornerRadius: 16))
+            .clipShape(.rect(cornerRadius: 16))
+            .padding(.horizontal, 16)
+            .padding(.top, 4)
+        }
+    }
+}
+
+private struct ModelRow: View {
+    @Bindable var store: ChatStore
+    @Environment(\.dismiss) private var dismiss
+    let model: AIModel
+
+    var body: some View {
+        Button {
+            withAnimation(.snappy) { store.model = model }
+            dismiss()
+        } label: {
+            HStack {
+                Text(model.rawValue)
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                if store.model == model {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .background(store.model == model ? Color.white.opacity(0.16) : .clear, in: .rect(cornerRadius: 0))
     }
 }
 
