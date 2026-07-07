@@ -462,24 +462,42 @@ final class SidebarStore {
 
 struct AICodeChatView: View {
     @State private var sidebarStore = SidebarStore()
-    @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @State private var showSidebar = false
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            Sidebar(store: sidebarStore)
-                .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 340)
-        } detail: {
-            if let selectedChat = sidebarStore.chats.first(where: { $0.id == sidebarStore.selectedChatId }) {
-                ChatDetailView(store: selectedChat, columnVisibility: $columnVisibility)
-            } else {
-                ContentUnavailableView("Select a chat", systemImage: "bubble")
+        GeometryReader { geometry in
+            ZStack {
+                if let selectedChat = sidebarStore.chats.first(where: { $0.id == sidebarStore.selectedChatId }) {
+                    ChatDetailView(store: selectedChat, showSidebar: $showSidebar)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ContentUnavailableView("Select a chat", systemImage: "bubble")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+
+                // Dim detail when sidebar is open
+                Color.black.opacity(showSidebar ? 0.25 : 0)
+                    .ignoresSafeArea()
+                    .contentShape(.rect)
+                    .onTapGesture {
+                        withAnimation(.snappy) {
+                            showSidebar = false
+                        }
+                    }
+                    .allowsHitTesting(showSidebar)
+                    .animation(.snappy, value: showSidebar)
+
+                // Slide-over sidebar: 80% width
+                Sidebar(store: sidebarStore)
+                    .frame(width: geometry.size.width * 0.8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .offset(x: showSidebar ? 0 : -geometry.size.width * 0.8)
+                    .animation(.snappy, value: showSidebar)
             }
-        }
-        .navigationSplitViewStyle(.balanced)
-        .onChange(of: sidebarStore.selectedChatId) { _, _ in
-            if horizontalSizeClass == .compact {
-                columnVisibility = .detailOnly
+            .onChange(of: sidebarStore.selectedChatId) { _, _ in
+                withAnimation(.snappy) {
+                    showSidebar = false
+                }
             }
         }
     }
@@ -488,14 +506,14 @@ struct AICodeChatView: View {
 private struct ChatDetailView: View {
     @Bindable var store: ChatStore
     @State private var showModelSheet = false
-    @Binding var columnVisibility: NavigationSplitViewVisibility
+    @Binding var showSidebar: Bool
 
     var body: some View {
         ZStack {
             Background()
 
             VStack(spacing: 0) {
-                Header(store: store, showModelSheet: $showModelSheet, columnVisibility: $columnVisibility)
+                Header(store: store, showModelSheet: $showModelSheet, showSidebar: $showSidebar)
                 MessageList(store: store)
             }
             .contentShape(.rect)
@@ -539,13 +557,13 @@ private struct Sidebar: View {
     var body: some View {
         ZStack {
             Color(.systemBackground)
+                .ignoresSafeArea()
             LinearGradient(
                 colors: [.purple.opacity(0.08), .clear, .teal.opacity(0.06)],
                 startPoint: .topLeading, endPoint: .bottomTrailing
             )
-        }
-        .ignoresSafeArea()
-        .overlay {
+            .ignoresSafeArea()
+
             VStack(spacing: 0) {
                 HStack {
                     Text("Chats")
@@ -667,26 +685,25 @@ private struct Background: View {
 private struct Header: View {
     @Bindable var store: ChatStore
     @Binding var showModelSheet: Bool
-    @Binding var columnVisibility: NavigationSplitViewVisibility
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Binding var showSidebar: Bool
     @State private var showRenameAlert = false
     @State private var renameDraft = ""
 
     var body: some View {
         GlassEffectContainer(spacing: 12) {
             HStack(spacing: 12) {
-                // Sidebar toggle (iPhone / collapsed)
-                if horizontalSizeClass == .compact {
-                    Button {
-                        columnVisibility = .all
-                    } label: {
-                        Image(systemName: "line.3.horizontal")
-                            .font(.system(size: 17, weight: .semibold))
-                            .frame(width: 44, height: 44)
+                // Sidebar toggle
+                Button {
+                    withAnimation(.snappy) {
+                        showSidebar.toggle()
                     }
-                    .buttonStyle(.plain)
-                    .glassEffect(.regular.interactive())
+                } label: {
+                    Image(systemName: "line.3.horizontal")
+                        .font(.system(size: 17, weight: .semibold))
+                        .frame(width: 44, height: 44)
                 }
+                .buttonStyle(.plain)
+                .glassEffect(.regular.interactive())
 
                 // New chat
                 Button {
