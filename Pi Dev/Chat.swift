@@ -515,10 +515,12 @@ private struct Header: View {
                     } label: {
                         Label("Edit", systemImage: "pencil")
                     }
-                    Button {
-                        store.forkChat()
-                    } label: {
-                        Label("Fork", systemImage: "arrow.branch")
+                    if !store.messages.isEmpty {
+                        Button {
+                            store.forkChat()
+                        } label: {
+                            Label("Fork", systemImage: "arrow.branch")
+                        }
                     }
                 } label: {
                     HStack {
