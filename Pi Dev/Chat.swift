@@ -639,7 +639,7 @@ private struct MessageList: View {
 private struct EmptyChatView: View {
     var body: some View {
         Text("π")
-            .font(.system(size: 48, weight: .thin, design: .serif))
+            .font(.system(size: 32, weight: .thin, design: .serif))
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
