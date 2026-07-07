@@ -924,6 +924,9 @@ private struct AssistantMessage: View {
             if let thinking = message.thinking {
                 ThinkingBlock(thinking: thinking)
             }
+            if !message.tools.isEmpty {
+                ToolRow(tools: message.tools)
+            }
             ForEach(message.terminal) { run in
                 TerminalBlock(run: run)
             }
