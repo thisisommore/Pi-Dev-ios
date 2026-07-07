@@ -388,9 +388,10 @@ final class ChatStore: Identifiable {
             )
         }
         reply.tools = [
+            ToolUse(kind: .builtin, name: "file_search", detail: "Found SearchViewModel.swift, SearchView.swift, RepositoryClient.swift", symbol: "magnifyingglass"),
+            ToolUse(kind: .builtin, name: "file_edit", detail: "Edited SearchViewModel.swift, RepositoryClient.swift — +42 −11", symbol: "pencil.line"),
             ToolUse(kind: .mcp, name: "github", detail: "Read repository/SearchViewModel.swift", symbol: "arrow.triangle.branch"),
             ToolUse(kind: .skill, name: "swift-testing", detail: "Generated 2 test cases", symbol: "checkmark.seal"),
-            ToolUse(kind: .builtin, name: "file_edit", detail: "3 files changed, +42 −11", symbol: "pencil.line"),
         ]
         reply.terminal = [
             TerminalRun(
