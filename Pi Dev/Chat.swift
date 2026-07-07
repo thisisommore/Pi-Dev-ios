@@ -568,7 +568,7 @@ private struct Sidebar: View {
 
             VStack(spacing: 0) {
                 HStack {
-                    Text("Pi Code")
+                    Text("πcode")
                         .font(.largeTitle)
                     Spacer()
                     Button {
