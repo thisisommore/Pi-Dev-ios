@@ -1068,14 +1068,11 @@ private struct ToolRow: View {
     let tools: [ToolUse]
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(tools) { tool in
-                    ToolChip(tool: tool)
-                }
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(tools) { tool in
+                ToolChip(tool: tool)
             }
         }
-        .scrollClipDisabled()
     }
 }
 
@@ -1087,30 +1084,42 @@ private struct ToolChip: View {
         Button {
             withAnimation(.snappy) { expanded.toggle() }
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 Image(systemName: tool.symbol)
-                    .font(.system(size: 10, weight: .semibold))
-                Text(tool.name)
-                    .font(.caption2.weight(.semibold))
-                Text(tool.kind.label)
-                    .font(.system(size: 8, weight: .heavy))
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background(tool.kind.tint.opacity(0.18), in: .capsule)
-                if expanded {
-                    Text(tool.detail)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .transition(.opacity)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 18)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(tool.name)
+                            .font(.caption2.weight(.semibold))
+                        Text(tool.kind.label)
+                            .font(.system(size: 8, weight: .heavy))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(.secondary.opacity(0.15), in: .capsule)
+                    }
+                    if expanded {
+                        Text(tool.detail)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .transition(.opacity)
+                    }
                 }
+
+                Spacer(minLength: 0)
+
+                Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.secondary)
             }
-            .foregroundStyle(tool.kind.tint)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .contentShape(.capsule)
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(.secondary.opacity(0.08), in: .rect(cornerRadius: 12))
         }
         .buttonStyle(.plain)
-        .glassEffect(.regular.tint(tool.kind.tint.opacity(0.1)).interactive(), in: .capsule)
     }
 }
 
