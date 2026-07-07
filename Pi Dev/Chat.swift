@@ -568,14 +568,14 @@ private struct Sidebar: View {
 
             VStack(spacing: 0) {
                 HStack {
-                    Text("Chats")
-                        .font(.title3.weight(.bold))
+                    Text("Pi Code")
+                        .font(.largeTitle)
                     Spacer()
                     Button {
                         store.newChat()
                     } label: {
-                        Image(systemName: "square.and.pencil")
-                            .font(.system(size: 16, weight: .semibold))
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 16, weight: .light))
                             .frame(width: 36, height: 36)
                             .background(.white.opacity(0.12), in: .circle)
                     }
@@ -585,28 +585,7 @@ private struct Sidebar: View {
                 .padding(.top, 16)
                 .padding(.bottom, 12)
 
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                    TextField("Search chats…", text: $store.searchText)
-                        .font(.subheadline)
-                    if !store.searchText.isEmpty {
-                        Button {
-                            store.searchText = ""
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 15))
-                                .foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(.secondary.opacity(0.12), in: .rect(cornerRadius: 12))
-                .padding(.horizontal, 16)
-                .padding(.bottom, 12)
+            
 
                 ScrollView {
                     LazyVStack(spacing: 8) {
@@ -626,7 +605,7 @@ private struct Sidebar: View {
                                     }
                                 }
                                 .padding(.horizontal, 14)
-                                .padding(.vertical, 14)
+                                .padding(.vertical, 18)
                                 .background(
                                     store.selectedChatId == chat.id
                                         ? .white.opacity(0.14)
