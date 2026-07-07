@@ -11,7 +11,8 @@ import SwiftUI
 struct Pi_DevApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            AICodeChatView()
+                .preferredColorScheme(.dark)
         }
     }
 }
