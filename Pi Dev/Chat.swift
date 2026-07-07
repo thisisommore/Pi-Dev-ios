@@ -1293,6 +1293,13 @@ private struct PillLabel: View {
 private struct ModelSheet: View {
     @Bindable var store: ChatStore
     @Environment(\.dismiss) private var dismiss
+    @State private var searchText = ""
+
+    private var filteredModels: [AIModel] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if query.isEmpty { return AIModel.allCases }
+        return AIModel.allCases.filter { $0.rawValue.lowercased().contains(query) }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -1302,52 +1309,56 @@ private struct ModelSheet: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, 10)
 
-            Text("Model")
-                .font(.title3.weight(.bold))
-                .padding(.horizontal, 20)
+            HStack {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                TextField("Search models…", text: $searchText)
+                    .font(.subheadline)
+                if !searchText.isEmpty {
+                    Button {
+                        searchText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(.secondary.opacity(0.12), in: .rect(cornerRadius: 14))
+            .padding(.horizontal, 20)
 
-            VStack(spacing: 8) {
-                ForEach(AIModel.allCases) { model in
+            VStack(spacing: 0) {
+                ForEach(filteredModels) { model in
                     Button {
                         withAnimation(.snappy) { store.model = model }
                         dismiss()
                     } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: model.symbol)
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(model.tint)
-                                .frame(width: 40, height: 40)
-                                .background(model.tint.opacity(0.12), in: .circle)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(model.rawValue)
-                                    .font(.subheadline.weight(.semibold))
-                                Text("\(model.blurb) · \(model.contextWindow.compactFormatted) ctx")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-
+                        HStack {
+                            Text(model.rawValue)
+                                .font(.subheadline.weight(.semibold))
                             Spacer()
-
                             if store.model == model {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(model.tint)
-                                    .font(.system(size: 18))
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 14, weight: .bold))
                             }
                         }
-                        .padding(12)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 14)
                         .contentShape(.rect)
                     }
                     .buttonStyle(.plain)
-                    .glassEffect(
-                        store.model == model
-                            ? .regular.tint(model.tint.opacity(0.12)).interactive()
-                            : .regular.interactive(),
-                        in: .rect(cornerRadius: 20)
-                    )
+
+                    if model != filteredModels.last {
+                        Divider()
+                            .padding(.horizontal, 20)
+                    }
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.top, 8)
 
             Spacer(minLength: 0)
         }
