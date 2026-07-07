@@ -10,6 +10,7 @@
 //
 
 import SwiftUI
+internal import UniformTypeIdentifiers
 
 // MARK: - ── Domain (fake) ─────────────────────────────────────────────────────
 
@@ -132,6 +133,12 @@ struct PastedItem: Identifiable {
     let content: String
 }
 
+struct ContextFile: Identifiable {
+    let id = UUID()
+    let name: String
+    let content: String
+}
+
 struct ChatMessage: Identifiable {
     enum Role { case user, assistant }
 
@@ -166,6 +173,7 @@ final class ChatStore {
 
     var editingMessageId: UUID? = nil
     var pastedItems: [PastedItem] = []
+    var contextFiles: [ContextFile] = []
 
     func newChat() {
         withAnimation(.snappy) {
@@ -176,6 +184,7 @@ final class ChatStore {
             draft = ""
             editingMessageId = nil
             pastedItems = []
+            contextFiles = []
         }
     }
 
@@ -200,13 +209,17 @@ final class ChatStore {
         guard !isResponding else { return }
 
         let pastedBody = pastedItems.map(\.content).joined(separator: "\n\n")
+        let fileBody = contextFiles.map { "File: \($0.name)\n\($0.content)" }.joined(separator: "\n\n")
+        let attachmentsBody = [pastedBody, fileBody].filter { !$0.isEmpty }.joined(separator: "\n\n")
         let body: String
-        if pastedItems.isEmpty {
-            body = draft
+        if draft.isEmpty && attachmentsBody.isEmpty {
+            body = ""
         } else if draft.isEmpty {
-            body = pastedBody
+            body = attachmentsBody
+        } else if attachmentsBody.isEmpty {
+            body = draft
         } else {
-            body = draft + "\n\n" + pastedBody
+            body = draft + "\n\n" + attachmentsBody
         }
         let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
@@ -219,12 +232,14 @@ final class ChatStore {
                 editingMessageId = nil
                 draft = ""
                 pastedItems = []
+                contextFiles = []
             }
             return
         }
 
         draft = ""
         pastedItems = []
+        contextFiles = []
         if messages.isEmpty { chatTitle = String(trimmed.prefix(34)) }
 
         withAnimation(.snappy) {
@@ -954,6 +969,11 @@ private struct Composer: View {
     @Binding var showModelSheet: Bool
     @FocusState private var focused: Bool
     @State private var selectedPastedItem: PastedItem?
+    @State private var selectedContextFile: ContextFile?
+    @State private var showFileImporter = false
+    @State private var showClearAlert = false
+
+    private var hasAttachments: Bool { !store.pastedItems.isEmpty || !store.contextFiles.isEmpty }
 
     var body: some View {
         GlassEffectContainer(spacing: 10) {
@@ -966,53 +986,49 @@ private struct Composer: View {
 
                 // Input + buttons container
                 VStack(spacing: 0) {
-                    if !store.pastedItems.isEmpty {
+                    if hasAttachments {
+                        HStack {
+                            Spacer()
+                            Button("Clear all") {
+                                showClearAlert = true
+                            }
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 8)
+
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
                                 ForEach(store.pastedItems) { item in
-                                    HStack(alignment: .top, spacing: 8) {
-                                        Button {
-                                            selectedPastedItem = item
-                                        } label: {
-                                            VStack(alignment: .leading, spacing: 4) {
-                                                HStack(spacing: 6) {
-                                                    Image(systemName: "doc.on.clipboard")
-                                                        .font(.system(size: 11, weight: .semibold))
-                                                    Text("Pasted")
-                                                        .font(.caption.weight(.semibold))
-                                                }
-                                                Text(String(item.content.prefix(200)))
-                                                    .font(.system(size: 10))
-                                                    .foregroundStyle(.secondary)
-                                                    .lineLimit(3)
-                                                    .multilineTextAlignment(.leading)
-                                            }
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                            .foregroundStyle(.primary)
-                                        }
-                                        .buttonStyle(.plain)
-
-                                        Button {
+                                    attachmentCard(
+                                        icon: "doc.on.clipboard",
+                                        title: "Pasted",
+                                        preview: item.content,
+                                        onTap: { selectedPastedItem = item },
+                                        onRemove: {
                                             withAnimation(.snappy) {
                                                 store.pastedItems.removeAll { $0.id == item.id }
                                             }
-                                        } label: {
-                                            Image(systemName: "xmark")
-                                                .font(.system(size: 10, weight: .bold))
-                                                .foregroundStyle(.secondary)
-                                                .frame(width: 22, height: 22)
-                                                .background(.secondary.opacity(0.15), in: .circle)
                                         }
-                                        .buttonStyle(.plain)
-                                    }
-                                    .frame(width: 150, alignment: .leading)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 8)
-                                    .background(.white.opacity(0.12), in: .rect(cornerRadius: 12))
+                                    )
+                                }
+                                ForEach(store.contextFiles) { file in
+                                    attachmentCard(
+                                        icon: "doc.text",
+                                        title: file.name,
+                                        preview: file.content,
+                                        onTap: { selectedContextFile = file },
+                                        onRemove: {
+                                            withAnimation(.snappy) {
+                                                store.contextFiles.removeAll { $0.id == file.id }
+                                            }
+                                        }
+                                    )
                                 }
                             }
                             .padding(.horizontal, 14)
-                            .padding(.top, 10)
+                            .padding(.top, 6)
                         }
                         .scrollClipDisabled()
                     }
@@ -1033,7 +1049,7 @@ private struct Composer: View {
                                 store.draft = ""
                             }
                         }
-                        .padding(.top, store.pastedItems.isEmpty ? 14 : 8)
+                        .padding(.top, hasAttachments ? 8 : 14)
                         .padding(.horizontal, 14)
 
                     HStack(spacing: 8) {
@@ -1067,7 +1083,9 @@ private struct Composer: View {
 
                         Spacer()
 
-                        Button {} label: {
+                        Button {
+                            showFileImporter = true
+                        } label: {
                             Image(systemName: "plus")
                                 .font(.system(size: 16, weight: .semibold))
                                 .frame(width: 40, height: 40)
@@ -1089,8 +1107,8 @@ private struct Composer: View {
                                 )
                         }
                         .buttonStyle(.plain)
-                        .disabled((store.draft.isEmpty && store.pastedItems.isEmpty) || store.isResponding)
-                        .animation(.snappy, value: store.draft.isEmpty && store.pastedItems.isEmpty)
+                        .disabled((store.draft.isEmpty && store.pastedItems.isEmpty && store.contextFiles.isEmpty) || store.isResponding)
+                        .animation(.snappy, value: store.draft.isEmpty && store.pastedItems.isEmpty && store.contextFiles.isEmpty)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 6)
@@ -1101,11 +1119,86 @@ private struct Composer: View {
                 .padding(.bottom, 8)
             }
         }
+        .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.plainText, .sourceCode, .data], allowsMultipleSelection: true) { result in
+            importFiles(from: result)
+        }
         .sheet(item: $selectedPastedItem) { item in
             PastedSheet(item: item)
                 .presentationDetents([.medium])
                 .presentationBackground(.thinMaterial)
                 .presentationCornerRadius(32)
+        }
+        .sheet(item: $selectedContextFile) { file in
+            ContextFileSheet(file: file)
+                .presentationDetents([.medium])
+                .presentationBackground(.thinMaterial)
+                .presentationCornerRadius(32)
+        }
+        .alert("Clear all attachments?", isPresented: $showClearAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Clear", role: .destructive) {
+                withAnimation(.snappy) {
+                    store.pastedItems = []
+                    store.contextFiles = []
+                }
+            }
+        } message: {
+            Text("This will remove all attachments")
+        }
+    }
+
+    private func attachmentCard(icon: String, title: String, preview: String, onTap: @escaping () -> Void, onRemove: @escaping () -> Void) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Button(action: onTap) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Image(systemName: icon)
+                            .font(.system(size: 11, weight: .semibold))
+                        Text(title)
+                            .font(.caption.weight(.semibold))
+                            .lineLimit(1)
+                    }
+                    Text(String(preview.prefix(200)))
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
+                        .multilineTextAlignment(.leading)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .foregroundStyle(.primary)
+            }
+            .buttonStyle(.plain)
+
+            Button(action: onRemove) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 22, height: 22)
+                    .background(.secondary.opacity(0.15), in: .circle)
+            }
+            .buttonStyle(.plain)
+        }
+        .frame(width: 150, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.white.opacity(0.12), in: .rect(cornerRadius: 12))
+    }
+
+    private func importFiles(from result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            Task { @MainActor in
+                for url in urls {
+                    let gotAccess = url.startAccessingSecurityScopedResource()
+                    defer { if gotAccess { url.stopAccessingSecurityScopedResource() } }
+                    if let content = try? String(contentsOf: url, encoding: .utf8) {
+                        let name = url.lastPathComponent
+                        store.contextFiles.append(ContextFile(name: name, content: content))
+                    }
+                }
+            }
+        case .failure:
+            break
         }
     }
 }
@@ -1131,6 +1224,38 @@ private struct PastedSheet: View {
             ScrollView {
                 Text(item.content)
                     .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .lineSpacing(3)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 20)
+                    .textSelection(.enabled)
+            }
+        }
+    }
+}
+
+private struct ContextFileSheet: View {
+    let file: ContextFile
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Capsule()
+                .fill(.tertiary)
+                .frame(width: 36, height: 5)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 10)
+
+            Text(file.name)
+                .font(.title3.weight(.bold))
+                .lineLimit(1)
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+                .padding(.bottom, 8)
+
+            ScrollView {
+                Text(file.content)
+                    .font(.system(size: 12, design: .monospaced))
                     .foregroundStyle(.secondary)
                     .lineSpacing(3)
                     .padding(.horizontal, 20)
@@ -1231,7 +1356,7 @@ private struct ModelSheet: View {
 
 // MARK: - ── Helpers ───────────────────────────────────────────────────────────
 
-private extension Int {
+extension Int {
     var compactFormatted: String {
         switch self {
         case 1_000_000...: String(format: "%.1fM", Double(self) / 1_000_000).replacingOccurrences(of: ".0M", with: "M")
