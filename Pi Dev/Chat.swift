@@ -622,8 +622,8 @@ private struct Sidebar: View {
                                 .padding(.vertical, 18)
                                 .background(
                                     store.selectedChatId == chat.id
-                                        ? .regularMaterial
-                                        : .clear,
+                                        ? AnyShapeStyle(.regularMaterial)
+                                        : AnyShapeStyle(.clear),
                                     in: .rect(cornerRadius: 12)
                                 )
                             }
