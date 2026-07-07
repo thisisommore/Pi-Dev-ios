@@ -424,9 +424,23 @@ final class SidebarStore {
     var searchText = ""
 
     init() {
-        let first = ChatStore()
-        chats = [first]
-        selectedChatId = first.id
+        let titles = [
+            "Debounce repo search",
+            "Add SwiftData sync",
+            "Refactor networking layer",
+            "Fix memory leak in image cache",
+            "Design settings screen",
+            "API error handling",
+            "Implement push notifications",
+            "Dark mode polish",
+            "Unit tests for auth"
+        ]
+        chats = titles.map { title in
+            let chat = ChatStore()
+            chat.chatTitle = title
+            return chat
+        }
+        selectedChatId = chats.first?.id
     }
 
     var filteredChats: [ChatStore] {
