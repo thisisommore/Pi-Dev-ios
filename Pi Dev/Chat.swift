@@ -626,7 +626,7 @@ private struct Sidebar: View {
                                     }
                                 }
                                 .padding(.horizontal, 14)
-                                .padding(.vertical, 10)
+                                .padding(.vertical, 14)
                                 .background(
                                     store.selectedChatId == chat.id
                                         ? .white.opacity(0.14)
