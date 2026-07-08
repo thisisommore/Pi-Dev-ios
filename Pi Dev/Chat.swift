@@ -1340,6 +1340,35 @@ private struct Composer: View {
                 }
                 .padding(.horizontal, 16)
 
+                // Queued messages appear stacked above the input
+                if !store.messageQueue.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(Array(store.messageQueue.enumerated().reversed()), id: \.offset) { index, message in
+                            HStack(spacing: 8) {
+                                Text(message)
+                                    .font(.caption)
+                                    .lineLimit(2)
+                                Spacer()
+                                Image(systemName: "arrow.up")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(.secondary)
+                                Button {
+                                    store.removeQueuedMessage(at: index)
+                                } label: {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundStyle(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(.secondary.opacity(0.08), in: .rect(cornerRadius: 12))
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                }
+
                 // Input + buttons container
                 VStack(spacing: 0) {
                     if hasAttachments {
@@ -1389,35 +1418,6 @@ private struct Composer: View {
                         .scrollClipDisabled()
                     }
 
-                    if !store.messageQueue.isEmpty {
-                        VStack(alignment: .leading, spacing: 6) {
-                            ForEach(store.messageQueue.indices, id: \.self) { index in
-                                HStack(spacing: 8) {
-                                    Text(store.messageQueue[index])
-                                        .font(.caption)
-                                        .lineLimit(2)
-                                    Spacer()
-                                    Image(systemName: "arrow.up")
-                                        .font(.system(size: 10, weight: .bold))
-                                        .foregroundStyle(.secondary)
-                                    Button {
-                                        store.removeQueuedMessage(at: index)
-                                    } label: {
-                                        Image(systemName: "xmark")
-                                            .font(.system(size: 10, weight: .bold))
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(.secondary.opacity(0.08), in: .rect(cornerRadius: 12))
-                            }
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.top, 8)
-                    }
-
                     TextField(store.editingMessageId != nil ? "Edit message…" : "Ask about your code…", text: $store.draft, axis: .vertical)
                         .lineLimit(1...5)
                         .focused($focused)
@@ -1434,7 +1434,7 @@ private struct Composer: View {
                                 store.draft = ""
                             }
                         }
-                        .padding(.top, (hasAttachments || !store.messageQueue.isEmpty) ? 8 : 14)
+                        .padding(.top, hasAttachments ? 8 : 14)
                         .padding(.horizontal, 14)
 
                     HStack(spacing: 8) {
