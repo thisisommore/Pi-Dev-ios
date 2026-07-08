@@ -20,9 +20,6 @@ struct Sidebar: View {
 
       VStack(spacing: 0) {
         HStack {
-          Text("πcode")
-            .font(.largeTitle)
-          Spacer()
           Button {
             Task { @MainActor in
               await store.newChat()
@@ -34,6 +31,9 @@ struct Sidebar: View {
           }
           .buttonStyle(.plain)
           .glassEffect(.regular.interactive(), in: .circle)
+          Spacer()
+          Text("πcode")
+            .font(.largeTitle)
         }
         .padding(.horizontal, 16)
         .padding(.top, 8)
