@@ -41,6 +41,7 @@ struct AssistantMessage: View {
       if !message.isStreaming {
         HStack(spacing: 10) {
           Text("\(message.tokens.formatted(.number.notation(.compactName))) tok")
+          CopyButton(message: message)
           RetryButton(message: message, store: store)
         }
         .font(.caption2)
@@ -74,6 +75,28 @@ private struct RetryButton: View {
         .font(.system(size: 12))
     }
     .buttonStyle(.plain)
+  }
+}
+
+private struct CopyButton: View {
+  let message: ChatMessage
+  @State private var copied = false
+
+  var body: some View {
+    Button {
+      let pasteboard = NSPasteboard.general
+      pasteboard.clearContents()
+      pasteboard.setString(message.text, forType: .string)
+      copied = true
+      DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+        copied = false
+      }
+    } label: {
+      Image(systemName: copied ? "checkmark" : "doc.on.doc")
+        .font(.system(size: 12))
+    }
+    .buttonStyle(.plain)
+    .help("Copy response")
   }
 }
 
