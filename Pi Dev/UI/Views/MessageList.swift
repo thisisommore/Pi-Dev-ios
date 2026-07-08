@@ -43,7 +43,10 @@ struct MessageList: View {
         }) { _, newValue in
           isNearBottom = newValue
         }
-        .onChange(of: store.messages.count) {
+        .onChange(of: store.messages.count) { oldCount, newCount in
+          if oldCount == 0 && newCount > 0 {
+            isNearBottom = true
+          }
           guard isNearBottom else { return }
           withAnimation(.snappy) {
             proxy.scrollTo(store.messages.last?.id, anchor: .bottom)
