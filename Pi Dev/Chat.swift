@@ -1330,11 +1330,11 @@ private struct TypingIndicator: View {
 
 private struct QueuedMessageRow: View {
     let queued: QueuedMessage
+    let isTopCard: Bool
     let onRemove: () -> Void
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        let isBottomCard = queued.id == 0
         HStack(spacing: 8) {
             Text(queued.text)
                 .font(.caption)
@@ -1356,22 +1356,26 @@ private struct QueuedMessageRow: View {
             colorScheme == .dark
                 ? AnyShapeStyle(.ultraThickMaterial)
                 : AnyShapeStyle(.white),
-            in: UnevenRoundedRectangle(
-                cornerRadii: .init(
-                    topLeading: 12,
-                    bottomLeading: isBottomCard ? 0 : 12,
-                    bottomTrailing: isBottomCard ? 0 : 12,
-                    topTrailing: 12
+            in: isTopCard
+                ? AnyShape(
+                    UnevenRoundedRectangle(
+                        cornerRadii: .init(
+                            topLeading: 12,
+                            bottomLeading: 0,
+                            bottomTrailing: 0,
+                            topTrailing: 12
+                        )
+                    )
                 )
-            )
+                : AnyShape(Rectangle())
         )
         .overlay(
             UnevenRoundedRectangle(
                 cornerRadii: .init(
-                    topLeading: 12,
-                    bottomLeading: isBottomCard ? 0 : 12,
-                    bottomTrailing: isBottomCard ? 0 : 12,
-                    topTrailing: 12
+                    topLeading: isTopCard ? 12 : 0,
+                    bottomLeading: 0,
+                    bottomTrailing: 0,
+                    topTrailing: isTopCard ? 12 : 0
                 )
             )
             .stroke(.secondary.opacity(0.25), lineWidth: 0.5)
@@ -1405,12 +1409,14 @@ private struct Composer: View {
                 VStack(spacing: 0) {
                     // Queued messages appear stacked above the input
                     if !store.messageQueue.isEmpty {
-                        VStack(alignment: .leading, spacing: 6) {
+                        VStack(alignment: .leading, spacing: 0) {
                             ForEach(store.queuedMessagesForDisplay) { queued in
                                 QueuedMessageRow(
                                     queued: queued,
-                                    onRemove: { store.removeQueuedMessage(at: queued.id) }
-                                )
+                                    isTopCard: queued.id == store.messageQueue.count - 1
+                                ) {
+                                    store.removeQueuedMessage(at: queued.id)
+                                }
                             }
                         }
                         .padding(.horizontal, 34)
