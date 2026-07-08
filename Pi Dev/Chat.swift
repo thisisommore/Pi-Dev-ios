@@ -1345,6 +1345,7 @@ private struct Composer: View {
                     if !store.messageQueue.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
                             ForEach(Array(store.messageQueue.enumerated().reversed()), id: \.offset) { index, message in
+                                let isBottomCard = index == 0
                                 HStack(spacing: 8) {
                                     Text(message)
                                         .font(.caption)
@@ -1364,7 +1365,17 @@ private struct Composer: View {
                                 }
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
-                                .background(.secondary.opacity(0.08), in: .rect(cornerRadius: 12))
+                                .background(
+                                    .secondary.opacity(0.08),
+                                    in: RoundedRectangle(
+                                        cornerRadii: .init(
+                                            topLeading: 12,
+                                            bottomLeading: isBottomCard ? 0 : 12,
+                                            bottomTrailing: isBottomCard ? 0 : 12,
+                                            topTrailing: 12
+                                        )
+                                    )
+                                )
                             }
                         }
                         .padding(.horizontal, 20)
