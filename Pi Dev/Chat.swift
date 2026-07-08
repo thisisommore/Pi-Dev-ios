@@ -166,6 +166,9 @@ final class ChatStore: Identifiable {
     var editingMessageId: UUID? = nil
     var pastedItems: [PastedItem] = []
     var contextFiles: [ContextFile] = []
+    var messageQueue: [String] = []
+
+    var isStreaming: Bool { messages.contains { $0.isStreaming } }
 
     func newChat() {
         withAnimation(.snappy) {
@@ -177,6 +180,7 @@ final class ChatStore: Identifiable {
             editingMessageId = nil
             pastedItems = []
             contextFiles = []
+            messageQueue = []
         }
     }
 
@@ -188,6 +192,7 @@ final class ChatStore: Identifiable {
             editingMessageId = nil
             pastedItems = []
             contextFiles = []
+            messageQueue = []
         }
     }
 
@@ -209,21 +214,7 @@ final class ChatStore: Identifiable {
     }
 
     func send() {
-        guard !isResponding else { return }
-
-        let pastedBody = pastedItems.map(\.content).joined(separator: "\n\n")
-        let fileBody = contextFiles.map { "File: \($0.name)\n\($0.content)" }.joined(separator: "\n\n")
-        let attachmentsBody = [pastedBody, fileBody].filter { !$0.isEmpty }.joined(separator: "\n\n")
-        let body: String
-        if draft.isEmpty && attachmentsBody.isEmpty {
-            body = ""
-        } else if draft.isEmpty {
-            body = attachmentsBody
-        } else if attachmentsBody.isEmpty {
-            body = draft
-        } else {
-            body = draft + "\n\n" + attachmentsBody
-        }
+        let body = composeBody()
         let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
@@ -243,18 +234,50 @@ final class ChatStore: Identifiable {
         draft = ""
         pastedItems = []
         contextFiles = []
-        if messages.isEmpty { chatTitle = String(trimmed.prefix(34)) }
+
+        if isResponding || isStreaming {
+            withAnimation(.snappy) {
+                messageQueue.append(trimmed)
+            }
+            return
+        }
+
+        sendNow(trimmed)
+    }
+
+    private func composeBody() -> String {
+        let pastedBody = pastedItems.map(\.content).joined(separator: "\n\n")
+        let fileBody = contextFiles.map { "File: \($0.name)\n\($0.content)" }.joined(separator: "\n\n")
+        let attachmentsBody = [pastedBody, fileBody].filter { !$0.isEmpty }.joined(separator: "\n\n")
+        if draft.isEmpty && attachmentsBody.isEmpty {
+            return ""
+        } else if draft.isEmpty {
+            return attachmentsBody
+        } else if attachmentsBody.isEmpty {
+            return draft
+        } else {
+            return draft + "\n\n" + attachmentsBody
+        }
+    }
+
+    private func sendNow(_ text: String) {
+        if messages.isEmpty { chatTitle = String(text.prefix(34)) }
 
         withAnimation(.snappy) {
-            messages.append(ChatMessage(role: .user, text: trimmed, tokens: 180))
+            messages.append(ChatMessage(role: .user, text: text, tokens: 180))
             usedTokens += 180
             isResponding = true
         }
 
-        // Stream a fake reply character by character.
         Task { @MainActor in
-            await streamReply(for: trimmed)
+            await streamReply(for: text)
         }
+    }
+
+    private func processQueue() {
+        guard !messageQueue.isEmpty, !isResponding, !isStreaming else { return }
+        let next = messageQueue.removeFirst()
+        sendNow(next)
     }
 
     func retry(from assistantMessageId: UUID) {
@@ -333,6 +356,8 @@ final class ChatStore: Identifiable {
                 self.usedTokens += reply.tokens
             }
         }
+
+        processQueue()
     }
 
     private static func stream(text: String, update: @escaping (String) -> Void) async {
@@ -1357,6 +1382,37 @@ private struct Composer: View {
                         .scrollClipDisabled()
                     }
 
+                    if !store.messageQueue.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ForEach(store.messageQueue.indices, id: \.self) { index in
+                                HStack(spacing: 8) {
+                                    Text(store.messageQueue[index])
+                                        .font(.caption)
+                                        .lineLimit(2)
+                                    Spacer()
+                                    Image(systemName: "arrow.up")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundStyle(.secondary)
+                                    Button {
+                                        withAnimation(.snappy) {
+                                            store.messageQueue.remove(at: index)
+                                        }
+                                    } label: {
+                                        Image(systemName: "xmark")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(.secondary.opacity(0.08), in: .rect(cornerRadius: 12))
+                            }
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.top, 8)
+                    }
+
                     TextField(store.editingMessageId != nil ? "Edit message…" : "Ask about your code…", text: $store.draft, axis: .vertical)
                         .lineLimit(1...5)
                         .focused($focused)
@@ -1373,7 +1429,7 @@ private struct Composer: View {
                                 store.draft = ""
                             }
                         }
-                        .padding(.top, hasAttachments ? 8 : 14)
+                        .padding(.top, (hasAttachments || !store.messageQueue.isEmpty) ? 8 : 14)
                         .padding(.horizontal, 14)
 
                     HStack(spacing: 8) {
@@ -1431,7 +1487,7 @@ private struct Composer: View {
                                 )
                         }
                         .buttonStyle(.plain)
-                        .disabled((store.draft.isEmpty && store.pastedItems.isEmpty && store.contextFiles.isEmpty) || store.isResponding)
+                        .disabled(store.draft.isEmpty && store.pastedItems.isEmpty && store.contextFiles.isEmpty)
                         .animation(.snappy, value: store.draft.isEmpty && store.pastedItems.isEmpty && store.contextFiles.isEmpty)
                     }
                     .frame(maxWidth: .infinity)
