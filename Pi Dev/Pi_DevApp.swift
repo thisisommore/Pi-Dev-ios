@@ -12,7 +12,6 @@ struct Pi_DevApp: App {
     var body: some Scene {
         WindowGroup {
             AICodeChatView()
-                .preferredColorScheme(.dark)
         }
     }
 }
