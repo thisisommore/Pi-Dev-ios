@@ -297,6 +297,18 @@ final class ChatStore: Identifiable {
     }
 
     var latestToolNames: [String: String] = [:]
+    var thinkingStartTime: Date?
+
+    func updateThinkingSeconds() {
+      guard let start = thinkingStartTime else { return }
+      let elapsed = Date().timeIntervalSince(start)
+      updateMessage(at: messageIndex) {
+        if $0.thinking == nil {
+          $0.thinking = Thinking(summary: "", truncated: "", full: "", seconds: 0)
+        }
+        $0.thinking?.seconds = elapsed
+      }
+    }
 
     print("[ChatStore] entering event loop")
     for await event in rpcClient.streamEvents(forPrompt: userText) {
@@ -319,6 +331,7 @@ final class ChatStore: Identifiable {
           print("[ChatStore] textDelta: '\(text.prefix(80))'")
           updateMessage(at: messageIndex) { $0.text += text }
         case .thinkingStart:
+          thinkingStartTime = Date()
           updateMessage(at: messageIndex) {
             if $0.thinking == nil {
               $0.thinking = Thinking(summary: "", truncated: "", full: "", seconds: 0)
@@ -332,6 +345,9 @@ final class ChatStore: Identifiable {
             $0.thinking?.summary += text
             $0.thinking?.full += text
           }
+          updateThinkingSeconds()
+        case .thinkingEnd:
+          updateThinkingSeconds()
         case .toolCallEnd(_, let call):
           let detail = call.arguments?.map { "\($0.key): \($0.value.value)" }.joined(separator: "\n") ?? ""
           updateMessage(at: messageIndex) {
@@ -361,10 +377,12 @@ final class ChatStore: Identifiable {
 
       case .messageEnd(let message):
         print("[ChatStore] messageEnd")
+        updateThinkingSeconds()
         finalize(message: message, at: messageIndex)
 
       case .agentEnd(let messages):
         print("[ChatStore] agentEnd messages.count=\(messages.count)")
+        updateThinkingSeconds()
         if let last = messages.last(where: { $0.role == "assistant" }) {
           finalize(message: last, at: messageIndex)
         } else {

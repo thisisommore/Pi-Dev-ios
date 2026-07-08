@@ -19,7 +19,7 @@ struct ThinkingBlock: View {
             .font(.system(size: 11, weight: .semibold))
             .foregroundStyle(.secondary)
             .symbolEffect(.pulse, isActive: false)
-          Text("Thought for \(thinking.seconds)s")
+          Text("Thought for \(thinking.seconds, format: .number.precision(.fractionLength(1)))s")
             .font(.caption.weight(.semibold))
           Spacer()
           Image(systemName: "chevron.down")
@@ -57,7 +57,7 @@ struct ThinkingSheet: View {
         .frame(maxWidth: .infinity)
         .padding(.top, 10)
 
-      Text("Thinking · \(thinking.seconds)s")
+      Text("Thinking · \(thinking.seconds, format: .number.precision(.fractionLength(1)))s")
         .font(.title3.weight(.bold))
         .padding(.horizontal, 20)
         .padding(.top, 12)

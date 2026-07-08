@@ -99,7 +99,7 @@ enum AICodeChatMock {
 
         Verified by running the existing SearchViewModelTests plus two new cases: rapid-typing cancellation and offline fallback. All green. I'll also add a small note in the PR about the new dependency on `RepositoryClient` error handling.
         """,
-        seconds: 18
+        seconds: 18.0
       )
     }
 
