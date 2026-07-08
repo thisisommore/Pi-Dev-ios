@@ -59,11 +59,9 @@ struct Sidebar: View {
                         .font(.subheadline.weight(.semibold))
                         .lineLimit(1)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                      if session.messageCount > 0 {
-                        Text("\(session.messageCount) messages")
-                          .font(.caption2)
-                          .foregroundStyle(.secondary)
-                      }
+                      Text(store.sessionDate(session))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                     }
                     if store.selectedSessionId == session.id {
                       Circle()

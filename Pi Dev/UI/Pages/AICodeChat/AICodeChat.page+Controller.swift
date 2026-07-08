@@ -573,6 +573,16 @@ final class SidebarStore {
     return String(text.prefix(34))
   }
 
+  func sessionDate(_ session: SessionInfo) -> String {
+    guard let date = ISO8601DateFormatter().date(from: session.created) else {
+      return session.created
+    }
+    let formatter = DateFormatter()
+    formatter.dateStyle = .medium
+    formatter.timeStyle = .none
+    return formatter.string(from: date)
+  }
+
   func loadSessions() async {
     do {
       let sessions = try await rpcClient.listSessions()
