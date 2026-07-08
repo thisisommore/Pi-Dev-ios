@@ -105,6 +105,14 @@ struct Composer: View {
             .padding(.horizontal, 14)
 
             HStack(spacing: 8) {
+              Button {
+                showModelSheet = true
+              } label: {
+                PillLabel(symbol: nil, text: store.selectedModel?.name ?? "Model")
+              }
+              .buttonStyle(.plain)
+              .glassEffect(.regular.interactive(), in: .capsule)
+
               Menu {
                 Picker("Thinking", selection: $store.thinkingLevel) {
                   ForEach(ThinkingLevel.allCases) { level in
@@ -119,14 +127,6 @@ struct Composer: View {
                 }
               } label: {
                 PillLabel(symbol: nil, text: store.thinkingLevel.rawValue)
-              }
-              .buttonStyle(.plain)
-              .glassEffect(.regular.interactive(), in: .capsule)
-
-              Button {
-                showModelSheet = true
-              } label: {
-                PillLabel(symbol: nil, text: store.selectedModel?.name ?? "Model")
               }
               .buttonStyle(.plain)
               .glassEffect(.regular.interactive(), in: .capsule)
