@@ -13,22 +13,12 @@ struct ThinkingBlock: View {
     Button {
       withAnimation(.snappy) { showSheet = true }
     } label: {
-      VStack(alignment: .leading, spacing: 8) {
-        HStack(spacing: 7) {
-          Image(systemName: "brain")
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(.secondary)
-            .symbolEffect(.pulse, isActive: false)
-          Spacer()
-        }
-
-        Text(thinking.summary)
-          .font(.caption)
-          .foregroundStyle(.secondary)
-          .lineLimit(2)
-      }
-      .padding(.vertical, 8)
-      .contentShape(.rect)
+      Text(thinking.summary)
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .lineLimit(2)
+        .padding(.vertical, 8)
+        .contentShape(.rect)
     }
     .buttonStyle(.plain)
     .sheet(isPresented: $showSheet) {
