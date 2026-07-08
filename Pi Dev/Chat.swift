@@ -1394,7 +1394,7 @@ private struct Composer: View {
                     .padding(.vertical, 6)
                     .padding(.horizontal, 10)
                 }
-                .background(.secondary.opacity(0.12), in: .rect(cornerRadius: 26))
+                .background(.ultraThickMaterial, in: .rect(cornerRadius: 26))
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
             }
