@@ -1252,6 +1252,7 @@ private struct Composer: View {
     @State private var selectedContextFile: ContextFile?
     @State private var showFileImporter = false
     @State private var showClearAlert = false
+    @Environment(\.colorScheme) private var colorScheme
 
     private var hasAttachments: Bool { !store.pastedItems.isEmpty || !store.contextFiles.isEmpty }
 
@@ -1394,7 +1395,12 @@ private struct Composer: View {
                     .padding(.vertical, 6)
                     .padding(.horizontal, 10)
                 }
-                .background(.ultraThickMaterial, in: .rect(cornerRadius: 26))
+                .background(
+                    colorScheme == .dark
+                        ? AnyShapeStyle(.ultraThickMaterial)
+                        : AnyShapeStyle(.white),
+                    in: .rect(cornerRadius: 26)
+                )
                 .overlay(
                     RoundedRectangle(cornerRadius: 26)
                         .stroke(.secondary.opacity(0.25), lineWidth: 0.5)
