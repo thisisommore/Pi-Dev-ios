@@ -596,7 +596,7 @@ private struct Sidebar: View {
                     .glassEffect(.regular.interactive(), in: .circle)
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 16)
+                .padding(.top, 8)
                 .padding(.bottom, 12)
 
             
