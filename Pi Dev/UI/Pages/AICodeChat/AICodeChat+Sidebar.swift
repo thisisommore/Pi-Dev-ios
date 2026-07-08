@@ -47,45 +47,50 @@ struct Sidebar: View {
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, minHeight: 80)
             } else {
-              ForEach(store.filteredSessions) { session in
-                Button {
-                  Task { @MainActor in
-                    await store.select(session: session)
-                  }
-                } label: {
-                  HStack(spacing: 10) {
-                    VStack(alignment: .leading, spacing: 2) {
-                      Text(store.sessionTitle(session))
-                        .font(.subheadline.weight(.semibold))
-                        .lineLimit(1)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                      Text(store.sessionDate(session))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                    }
-                    if store.selectedSessionId == session.id {
-                      Circle()
-                        .fill(.primary)
-                        .frame(width: 6, height: 6)
-                    }
-                  }
+              ForEach(store.groupedSessions, id: \.day) { group in
+                Text(store.sectionTitle(for: group.day))
+                  .font(.title3.weight(.bold))
+                  .frame(maxWidth: .infinity, alignment: .leading)
                   .padding(.horizontal, 14)
-                  .padding(.vertical, 14)
-                }
-                .buttonStyle(.plain)
-                .background {
-                  if store.selectedSessionId == session.id {
-                    Color.clear
-                      .glassEffect(.regular, in: .rect(cornerRadius: 12))
-                  }
-                }
-                .contextMenu {
-                  Button(role: .destructive) {
+                  .padding(.top, 8)
+
+                ForEach(group.sessions) { session in
+                  Button {
                     Task { @MainActor in
-                      await store.delete(session: session)
+                      await store.select(session: session)
                     }
                   } label: {
-                    Label("Delete", systemImage: "trash")
+                    HStack(spacing: 10) {
+                      VStack(alignment: .leading, spacing: 2) {
+                        Text(store.sessionTitle(session))
+                          .font(.subheadline.weight(.semibold))
+                          .lineLimit(1)
+                          .frame(maxWidth: .infinity, alignment: .leading)
+                      }
+                      if store.selectedSessionId == session.id {
+                        Circle()
+                          .fill(.primary)
+                          .frame(width: 6, height: 6)
+                      }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 14)
+                  }
+                  .buttonStyle(.plain)
+                  .background {
+                    if store.selectedSessionId == session.id {
+                      Color.clear
+                        .glassEffect(.regular, in: .rect(cornerRadius: 12))
+                    }
+                  }
+                  .contextMenu {
+                    Button(role: .destructive) {
+                      Task { @MainActor in
+                        await store.delete(session: session)
+                      }
+                    } label: {
+                      Label("Delete", systemImage: "trash")
+                    }
                   }
                 }
               }

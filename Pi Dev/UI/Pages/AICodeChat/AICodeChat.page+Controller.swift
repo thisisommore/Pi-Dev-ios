@@ -573,14 +573,42 @@ final class SidebarStore {
     return String(text.prefix(34))
   }
 
-  func sessionDate(_ session: SessionInfo) -> String {
-    guard let date = ISO8601DateFormatter().date(from: session.created) else {
-      return session.created
-    }
+  func sectionTitle(for day: Date) -> String {
+    guard day != Date.distantPast else { return "Unknown" }
     let formatter = DateFormatter()
     formatter.dateStyle = .medium
     formatter.timeStyle = .none
-    return formatter.string(from: date)
+    formatter.doesRelativeDateFormatting = true
+    return formatter.string(from: day)
+  }
+
+  private func sessionDay(_ session: SessionInfo) -> Date? {
+    let formatters: [ISO8601DateFormatter] = [
+      ISO8601DateFormatter(),
+      {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+      }(),
+      {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withFullDate, .withFullTime, .withFractionalSeconds]
+        return f
+      }()
+    ]
+    for formatter in formatters {
+      if let date = formatter.date(from: session.created) {
+        return Calendar.current.startOfDay(for: date)
+      }
+    }
+    return nil
+  }
+
+  var groupedSessions: [(day: Date, sessions: [SessionInfo])] {
+    let grouped = Dictionary(grouping: filteredSessions) { sessionDay($0) ?? Date.distantPast }
+    return grouped
+      .sorted { $0.key > $1.key }
+      .map { (day: $0.key, sessions: $0.value.sorted { $0.modified > $1.modified }) }
   }
 
   func loadSessions() async {
