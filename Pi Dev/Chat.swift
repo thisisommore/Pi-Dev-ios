@@ -10,7 +10,7 @@
 //
 
 import SwiftUI
-internal import UniformTypeIdentifiers
+import UniformTypeIdentifiers
 let appColor = Color.blue
 // MARK: - ── Domain (fake) ─────────────────────────────────────────────────────
 
@@ -258,15 +258,7 @@ final class ChatStore: Identifiable {
         let pastedBody = pastedItems.map(\.content).joined(separator: "\n\n")
         let fileBody = contextFiles.map { "File: \($0.name)\n\($0.content)" }.joined(separator: "\n\n")
         let attachmentsBody = [pastedBody, fileBody].filter { !$0.isEmpty }.joined(separator: "\n\n")
-        if draft.isEmpty && attachmentsBody.isEmpty {
-            return ""
-        } else if draft.isEmpty {
-            return attachmentsBody
-        } else if attachmentsBody.isEmpty {
-            return draft
-        } else {
-            return draft + "\n\n" + attachmentsBody
-        }
+        return [draft, attachmentsBody].filter { !$0.isEmpty }.joined(separator: "\n\n")
     }
 
     private func sendNow(_ text: String) {
@@ -325,7 +317,7 @@ final class ChatStore: Identifiable {
     private func streamReply(for userText: String) async {
         try? await Task.sleep(for: .seconds(0.6))
 
-        let reply = Self.cannedReply(for: userText, level: self.thinkingLevel)
+        let reply = Self.cannedReply(level: self.thinkingLevel)
         let messageIndex = self.messages.count
 
         await MainActor.run {
@@ -377,17 +369,17 @@ final class ChatStore: Identifiable {
     }
 
     private static func stream(text: String, update: @escaping (String) -> Void) async {
-        for i in 0..<text.count {
-            let index = text.index(text.startIndex, offsetBy: i)
-            let partial = String(text[...index])
-            await MainActor.run {
+        var partial = ""
+        for char in text {
+            partial.append(char)
+            await MainActor.run { [partial] in
                 update(partial)
             }
             try? await Task.sleep(for: .milliseconds(12))
         }
     }
 
-    private static func cannedReply(for prompt: String, level: ThinkingLevel) -> ChatMessage {
+    private static func cannedReply(level: ThinkingLevel) -> ChatMessage {
         var reply = ChatMessage(
             role: .assistant,
             text: """
@@ -484,7 +476,7 @@ final class ChatStore: Identifiable {
             ChatMessage(role: .user,
                         text: "Search in the repo list fires an API call on every keystroke. Can you debounce it and add an offline fallback?",
                         tokens: 210),
-            Self.cannedReply(for: "", level: .high),
+            Self.cannedReply(level: .high),
         ]
         usedTokens = 46_800
     }
@@ -850,8 +842,8 @@ private struct ContextGauge: View {
     var body: some View {
         Menu {
             Section("Context window") {
-                Label("\(remaining.compactFormatted) tokens left", systemImage: "gauge.open.with.lines.needle.33percent")
-                Label("\(used.compactFormatted) of \(window.compactFormatted) used", systemImage: "chart.pie")
+                Label("\(remaining.formatted(.number.notation(.compactName))) tokens left", systemImage: "gauge.open.with.lines.needle.33percent")
+                Label("\(used.formatted(.number.notation(.compactName))) of \(window.formatted(.number.notation(.compactName))) used", systemImage: "chart.pie")
             }
         } label: {
             ZStack {
@@ -1021,8 +1013,7 @@ private struct AssistantMessage: View {
             }
 
             HStack(spacing: 10) {
-                Text("\(message.tokens.compactFormatted) tok")
-                ActionIcon("doc.on.doc")
+                Text("\(message.tokens.formatted(.number.notation(.compactName))) tok")
                 RetryButton(message: message, store: store)
             }
             .font(.caption2)
@@ -1031,17 +1022,6 @@ private struct AssistantMessage: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16)
-    }
-}
-
-private struct ActionIcon: View {
-    let symbol: String
-    init(_ symbol: String) { self.symbol = symbol }
-    var body: some View {
-        Button {} label: {
-            Image(systemName: symbol).font(.system(size: 12))
-        }
-        .buttonStyle(.plain)
     }
 }
 
@@ -1345,7 +1325,6 @@ private struct TypingIndicator: View {
 
 private struct QueuedMessageRow: View {
     let queued: QueuedMessage
-    let isTopCard: Bool
     let onRemove: () -> Void
     @Environment(\.colorScheme) private var colorScheme
 
@@ -1371,29 +1350,11 @@ private struct QueuedMessageRow: View {
             colorScheme == .dark
                 ? AnyShapeStyle(.ultraThickMaterial)
                 : AnyShapeStyle(.white),
-            in: isTopCard
-                ? AnyShape(
-                    UnevenRoundedRectangle(
-                        cornerRadii: .init(
-                            topLeading: 12,
-                            bottomLeading: 0,
-                            bottomTrailing: 0,
-                            topTrailing: 12
-                        )
-                    )
-                )
-                : AnyShape(Rectangle())
+            in: .rect(cornerRadius: 12)
         )
         .overlay(
-            UnevenRoundedRectangle(
-                cornerRadii: .init(
-                    topLeading: isTopCard ? 12 : 0,
-                    bottomLeading: 0,
-                    bottomTrailing: 0,
-                    topTrailing: isTopCard ? 12 : 0
-                )
-            )
-            .stroke(.secondary.opacity(0.25), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(.secondary.opacity(0.25), lineWidth: 0.5)
         )
     }
 }
@@ -1415,21 +1376,12 @@ private struct Composer: View {
     var body: some View {
         GlassEffectContainer(spacing: 10) {
             VStack(spacing: 10) {
-                // Removed the model selector pill from quick controls
-                HStack(spacing: 8) {
-                    Spacer()
-                }
-                .padding(.horizontal, 16)
-
                 VStack(spacing: 0) {
                     // Queued messages appear stacked above the input
                     if !store.messageQueue.isEmpty {
                         VStack(alignment: .leading, spacing: 0) {
                             ForEach(store.queuedMessagesForDisplay) { queued in
-                                QueuedMessageRow(
-                                    queued: queued,
-                                    isTopCard: queued.id == store.messageQueue.count - 1
-                                ) {
+                                QueuedMessageRow(queued: queued) {
                                     store.removeQueuedMessage(at: queued.id)
                                 }
                             }
@@ -1586,13 +1538,13 @@ private struct Composer: View {
             importFiles(from: result)
         }
         .sheet(item: $selectedPastedItem) { item in
-            PastedSheet(item: item)
+            AttachmentSheet(title: "Pasted content", content: item.content, monospaced: false)
                 .presentationDetents([.medium])
                 .presentationBackground(.thinMaterial)
                 .presentationCornerRadius(32)
         }
         .sheet(item: $selectedContextFile) { file in
-            ContextFileSheet(file: file)
+            AttachmentSheet(title: file.name, content: file.content, monospaced: true)
                 .presentationDetents([.medium])
                 .presentationBackground(.thinMaterial)
                 .presentationCornerRadius(32)
@@ -1666,9 +1618,10 @@ private struct Composer: View {
     }
 }
 
-private struct PastedSheet: View {
-    let item: PastedItem
-    @Environment(\.dismiss) private var dismiss
+private struct AttachmentSheet: View {
+    let title: String
+    let content: String
+    let monospaced: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -1678,38 +1631,7 @@ private struct PastedSheet: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, 10)
 
-            Text("Pasted content")
-                .font(.title3.weight(.bold))
-                .padding(.horizontal, 20)
-                .padding(.top, 12)
-                .padding(.bottom, 8)
-
-            ScrollView {
-                Text(item.content)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .lineSpacing(3)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 20)
-                    .textSelection(.enabled)
-            }
-        }
-    }
-}
-
-private struct ContextFileSheet: View {
-    let file: ContextFile
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Capsule()
-                .fill(.tertiary)
-                .frame(width: 36, height: 5)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 10)
-
-            Text(file.name)
+            Text(title)
                 .font(.title3.weight(.bold))
                 .lineLimit(1)
                 .padding(.horizontal, 20)
@@ -1717,8 +1639,8 @@ private struct ContextFileSheet: View {
                 .padding(.bottom, 8)
 
             ScrollView {
-                Text(file.content)
-                    .font(.system(size: 12, design: .monospaced))
+                Text(content)
+                    .font(monospaced ? .system(size: 12, design: .monospaced) : .callout)
                     .foregroundStyle(.secondary)
                     .lineSpacing(3)
                     .padding(.horizontal, 20)
@@ -1755,14 +1677,6 @@ private struct PillLabel: View {
 
 private struct ModelSheet: View {
     @Bindable var store: ChatStore
-    @Environment(\.dismiss) private var dismiss
-    @State private var searchText = ""
-
-    private var filteredModels: [AIModel] {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        if query.isEmpty { return AIModel.allCases }
-        return AIModel.allCases.filter { $0.rawValue.lowercased().contains(query) }
-    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -1772,47 +1686,20 @@ private struct ModelSheet: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, 10)
 
-            searchBar
-
-            ModelList(store: store, models: filteredModels)
+            ModelList(store: store, models: AIModel.allCases)
 
             Spacer(minLength: 0)
         }
-    }
-
-    private var searchBar: some View {
-        HStack {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.secondary)
-            TextField("Search models…", text: $searchText)
-                .font(.subheadline)
-            if !searchText.isEmpty {
-                Button {
-                    searchText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 16))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(.secondary.opacity(0.12), in: .rect(cornerRadius: 14))
-        .padding(.horizontal, 20)
     }
 }
 
 private struct ModelList: View {
     @Bindable var store: ChatStore
-    @Environment(\.dismiss) private var dismiss
     let models: [AIModel]
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            LazyVStack(spacing: 0) {
+            VStack(spacing: 0) {
                 ForEach(models) { model in
                     ModelRow(store: store, model: model)
 
@@ -1855,21 +1742,12 @@ private struct ModelRow: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .background(store.model == model ? Color.secondary.opacity(0.15) : .clear, in: .rect(cornerRadius: 0))
+        .background(store.model == model ? Color.secondary.opacity(0.15) : .clear)
     }
 }
 
 // MARK: - ── Helpers ───────────────────────────────────────────────────────────
 
-extension Int {
-    var compactFormatted: String {
-        switch self {
-        case 1_000_000...: String(format: "%.1fM", Double(self) / 1_000_000).replacingOccurrences(of: ".0M", with: "M")
-        case 1_000...:     String(format: "%.1fK", Double(self) / 1_000).replacingOccurrences(of: ".0K", with: "K")
-        default:           "\(self)"
-        }
-    }
-}
 
 // MARK: - ── Preview ───────────────────────────────────────────────────────────
 
