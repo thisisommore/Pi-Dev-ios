@@ -51,8 +51,8 @@ struct Sidebar: View {
                 Text(store.sectionTitle(for: group.day))
                   .font(.title3.weight(.bold))
                   .frame(maxWidth: .infinity, alignment: .leading)
-                  .padding(.horizontal, 14)
-                  .padding(.vertical, 8)
+                  .padding(.horizontal, 0)
+                  .padding(.vertical, 18)
 
                 ForEach(group.sessions) { session in
                   Button {
@@ -63,7 +63,7 @@ struct Sidebar: View {
                     HStack(spacing: 10) {
                       VStack(alignment: .leading, spacing: 2) {
                         Text(store.sessionTitle(session))
-                          .font(.subheadline.weight(.semibold))
+                          .font(.subheadline.weight(.regular))
                           .lineLimit(1)
                           .frame(maxWidth: .infinity, alignment: .leading)
                       }
