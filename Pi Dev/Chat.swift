@@ -1344,7 +1344,7 @@ private struct Composer: View {
                     // Queued messages appear stacked above the input
                     if !store.messageQueue.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
-                            ForEach((0..<store.messageQueue.count).reversed(), id: \.self) { index in
+                            ForEach((0..<store.messageQueue.count).map { store.messageQueue.count - 1 - $0 }, id: \.self) { index in
                                 let message = store.messageQueue[index]
                                 let isBottomCard = index == 0
                                 HStack(spacing: 8) {
