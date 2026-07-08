@@ -775,7 +775,7 @@ private struct ContextGauge: View {
                     .stroke(.quaternary, lineWidth: 3.5)
                 Circle()
                     .trim(from: 0, to: fraction)
-                    .stroke(.primary.gradient, style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
+                    .stroke(Color.primary.gradient, style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
                     .rotationEffect(.degrees(-90))
             }
             .padding(9)
