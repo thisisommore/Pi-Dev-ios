@@ -1325,8 +1325,15 @@ private struct TypingIndicator: View {
 
 private struct QueuedMessageRow: View {
     let queued: QueuedMessage
+    let isFirst: Bool
     let onRemove: () -> Void
     @Environment(\.colorScheme) private var colorScheme
+
+    private var rowShape: some Shape {
+        isFirst
+            ? .rect(cornerRadii: .init(topLeading: 12, bottomLeading: 0, bottomTrailing: 0, topTrailing: 12))
+            : .rect(cornerRadii: .init(topLeading: 0, bottomLeading: 0, bottomTrailing: 0, topTrailing: 0))
+    }
 
     var body: some View {
         HStack(spacing: 8) {
@@ -1350,10 +1357,10 @@ private struct QueuedMessageRow: View {
             colorScheme == .dark
                 ? AnyShapeStyle(.ultraThickMaterial)
                 : AnyShapeStyle(.white),
-            in: .rect(cornerRadius: 12)
+            in: rowShape
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            rowShape
                 .stroke(.secondary.opacity(0.25), lineWidth: 0.5)
         )
     }
@@ -1380,8 +1387,8 @@ private struct Composer: View {
                     // Queued messages appear stacked above the input
                     if !store.messageQueue.isEmpty {
                         VStack(alignment: .leading, spacing: 0) {
-                            ForEach(store.queuedMessagesForDisplay) { queued in
-                                QueuedMessageRow(queued: queued) {
+                            ForEach(Array(store.queuedMessagesForDisplay.enumerated()), id: \.element.id) { index, queued in
+                                QueuedMessageRow(queued: queued, isFirst: index == 0) {
                                     store.removeQueuedMessage(at: queued.id)
                                 }
                             }
