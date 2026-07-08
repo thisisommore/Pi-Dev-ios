@@ -55,6 +55,9 @@ struct MessageList: View {
             proxy.scrollTo(store.messages.last?.id, anchor: .bottom)
           }
         }
+        .onAppear {
+          proxy.scrollTo(store.messages.last?.id, anchor: .bottom)
+        }
       }
     }
   }
