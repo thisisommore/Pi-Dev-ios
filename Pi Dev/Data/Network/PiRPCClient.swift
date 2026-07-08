@@ -130,6 +130,20 @@ final class PiRPCClient {
     try await send(command: ["type": "get_available_models"])
   }
 
+  // MARK: - Health check
+
+  /// Validates the configured base URL and auth token by calling `get_state`.
+  /// Returns `.success` if the server responds with a valid RPC success response,
+  /// or `.failure` with the underlying error otherwise.
+  func healthCheck() async -> Result<Void, Error> {
+    do {
+      _ = try await getState()
+      return .success(())
+    } catch {
+      return .failure(error)
+    }
+  }
+
   // MARK: - Session REST endpoints
 
   func listSessions() async throws -> [SessionInfo] {

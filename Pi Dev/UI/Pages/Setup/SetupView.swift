@@ -11,6 +11,8 @@ struct SetupView: View {
 
   @State private var urlDraft = ""
   @State private var tokenDraft = ""
+  @State private var isChecking = false
+  @State private var errorMessage: String?
   @FocusState private var focusedField: Field?
 
   private enum Field: Hashable {
@@ -27,7 +29,8 @@ struct SetupView: View {
   }
 
   private var canContinue: Bool {
-    URL(string: normalizedURL) != nil
+    !isChecking
+      && URL(string: normalizedURL) != nil
       && !tokenDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
 
@@ -59,7 +62,7 @@ struct SetupView: View {
             text: $urlDraft,
             field: .url
           ) {
-            TextField("Server URL", text: $urlDraft)
+            TextField("Server URL", text: $urlDraft, prompt: Text("http://localhost:3000"))
               .textInputAutocapitalization(.never)
               .autocorrectionDisabled()
               .keyboardType(.URL)
@@ -78,27 +81,48 @@ struct SetupView: View {
         }
         .padding(.horizontal, 32)
 
-        Button {
-          continueTapped()
-        } label: {
-          HStack(spacing: 8) {
-            Text("Continue")
-              .font(.subheadline.weight(.semibold))
-            Image(systemName: "arrow.right")
-              .font(.system(size: 14, weight: .semibold))
+        VStack(spacing: 12) {
+          Button {
+            continueTapped()
+          } label: {
+            HStack(spacing: 8) {
+              if isChecking {
+                ProgressView()
+                  .tint(.white)
+                  .scaleEffect(0.8)
+              }
+              Text(isChecking ? "Checking…" : "Continue")
+                .font(.subheadline.weight(.semibold))
+              if !isChecking {
+                Image(systemName: "arrow.right")
+                  .font(.system(size: 14, weight: .semibold))
+              }
+            }
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(
+              canContinue
+                ? AnyShapeStyle(appColor.gradient)
+                : AnyShapeStyle(.gray.opacity(0.4)),
+              in: .rect(cornerRadius: 20)
+            )
           }
-          .foregroundStyle(.white)
-          .frame(maxWidth: .infinity)
-          .padding(.vertical, 16)
-          .background(
-            canContinue
-              ? AnyShapeStyle(appColor.gradient)
-              : AnyShapeStyle(.gray.opacity(0.4)),
-            in: .rect(cornerRadius: 20)
-          )
+          .buttonStyle(.plain)
+          .disabled(!canContinue)
+
+          if let errorMessage {
+            HStack(spacing: 6) {
+              Image(systemName: "exclamationmark.triangle.fill")
+                .font(.caption)
+              Text(errorMessage)
+                .font(.caption)
+            }
+            .foregroundStyle(.orange)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 8)
+          }
         }
-        .buttonStyle(.plain)
-        .disabled(!canContinue)
         .padding(.horizontal, 32)
 
         Spacer()
@@ -142,9 +166,25 @@ struct SetupView: View {
     let trimmedToken = tokenDraft.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmedToken.isEmpty, let url = URL(string: normalizedURL) else { return }
 
-    withAnimation(.snappy) {
-      serverURL = url.absoluteString
-      authToken = trimmedToken
+    isChecking = true
+    errorMessage = nil
+    focusedField = nil
+
+    Task { @MainActor in
+      let client = PiRPCClient(baseURL: url, authToken: trimmedToken)
+      let result = await client.healthCheck()
+
+      isChecking = false
+
+      switch result {
+      case .success:
+        withAnimation(.snappy) {
+          serverURL = url.absoluteString
+          authToken = trimmedToken
+        }
+      case .failure(let error):
+        errorMessage = error.localizedDescription
+      }
     }
   }
 }
