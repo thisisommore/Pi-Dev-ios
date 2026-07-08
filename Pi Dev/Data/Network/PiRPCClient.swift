@@ -5,7 +5,7 @@
 
 import Foundation
 
-/// HTTP JSON-RPC client for the π coding-agent server at localhost:3000.
+/// HTTP JSON-RPC client for the π coding-agent server.
 ///
 /// The server is expected to accept POST requests whose body is a π RPC command
 /// object (e.g. `{ "type": "prompt", "message": "..." }`) and return the
@@ -13,13 +13,34 @@ import Foundation
 /// `/events` or by polling `get_last_assistant_text` when SSE is unavailable.
 final class PiRPCClient {
   let baseURL: URL
+  let authToken: String
   private let urlSession: URLSession
   private var activeTask: Task<Void, Never>?
   private let lock = NSLock()
 
-  init(baseURL: URL = URL(string: "http://localhost:3000")!, urlSession: URLSession = .shared) {
+  init(baseURL: URL = PiRPCClient.configuredBaseURL(), authToken: String = PiRPCClient.configuredAuthToken(), urlSession: URLSession = .shared) {
     self.baseURL = baseURL
+    self.authToken = authToken
     self.urlSession = urlSession
+  }
+
+  private static func configuredBaseURL() -> URL {
+    let stored = UserDefaults.standard.string(forKey: "piServerBaseURL")
+    let raw = stored?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    if let url = URL(string: raw), !raw.isEmpty {
+      return url
+    }
+    return URL(string: "http://localhost:3000")!
+  }
+
+  private static func configuredAuthToken() -> String {
+    UserDefaults.standard.string(forKey: "piAuthToken")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+  }
+
+  private func configureAuth(for request: inout URLRequest) {
+    if !authToken.isEmpty {
+      request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
+    }
   }
 
   deinit {
@@ -46,6 +67,7 @@ final class PiRPCClient {
     var request = URLRequest(url: rerunURL)
     request.httpMethod = "POST"
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    configureAuth(for: &request)
 
     var body: [String: Any] = [:]
     if let message { body["message"] = message }
@@ -114,6 +136,7 @@ final class PiRPCClient {
     let sessionsURL = baseURL.appendingPathComponent("sessions")
     var request = URLRequest(url: sessionsURL)
     request.httpMethod = "GET"
+    configureAuth(for: &request)
 
     let (data, response) = try await urlSession.data(for: request)
     guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
@@ -140,6 +163,7 @@ final class PiRPCClient {
     var request = URLRequest(url: rpcURL)
     request.httpMethod = "POST"
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    configureAuth(for: &request)
     request.httpBody = try JSONSerialization.data(withJSONObject: command)
 
     let (data, response) = try await urlSession.data(for: request)
@@ -277,6 +301,7 @@ final class PiRPCClient {
     let eventsURL = baseURL.appendingPathComponent("events")
     var request = URLRequest(url: eventsURL)
     request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+    configureAuth(for: &request)
     print("[PiRPCClient] readSSE connecting to \(eventsURL)")
 
     do {

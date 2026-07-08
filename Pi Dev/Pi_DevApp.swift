@@ -9,9 +9,18 @@ import SwiftUI
 
 @main
 struct Pi_DevApp: App {
+    @AppStorage("piServerBaseURL") private var serverURL = ""
+    @AppStorage("piAuthToken") private var authToken = ""
+
     var body: some Scene {
         WindowGroup {
-            AICodeChatView()
+            Group {
+                if serverURL.isEmpty || authToken.isEmpty {
+                    SetupView()
+                } else {
+                    AICodeChatView()
+                }
+            }
         }
     }
 }
