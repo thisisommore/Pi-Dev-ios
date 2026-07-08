@@ -874,6 +874,7 @@ private struct ContextGauge: View {
 
 private struct MessageList: View {
     @Bindable var store: ChatStore
+    @State private var isNearBottom = true
 
     var body: some View {
         if store.messages.isEmpty {
@@ -902,7 +903,21 @@ private struct MessageList: View {
                 .frame(maxHeight: .infinity)
                 .scrollDismissesKeyboard(.interactively)
                 .scrollEdgeEffectStyle(.soft, for: .all)
+                .onScrollGeometryChange(for: Bool.self, of: { geometry in
+                    let threshold: CGFloat = 80
+                    let visibleBottom = geometry.contentOffset.y + geometry.bounds.height
+                    return visibleBottom >= geometry.contentSize.height - threshold
+                }) { _, newValue in
+                    isNearBottom = newValue
+                }
                 .onChange(of: store.messages.count) {
+                    guard isNearBottom else { return }
+                    withAnimation(.snappy) {
+                        proxy.scrollTo(store.messages.last?.id, anchor: .bottom)
+                    }
+                }
+                .onChange(of: store.messages.last?.text) {
+                    guard isNearBottom else { return }
                     withAnimation(.snappy) {
                         proxy.scrollTo(store.messages.last?.id, anchor: .bottom)
                     }
