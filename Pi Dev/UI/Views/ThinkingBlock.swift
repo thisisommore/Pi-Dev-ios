@@ -41,7 +41,7 @@ struct ThinkingSheet: View {
         .frame(maxWidth: .infinity)
         .padding(.top, 10)
 
-      Text("Thinking · \(thinking.seconds, format: .number.precision(.fractionLength(1)))s")
+      Text("Thinking")
         .font(.title3.weight(.bold))
         .padding(.horizontal, 20)
         .padding(.top, 12)
