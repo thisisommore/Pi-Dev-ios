@@ -1326,6 +1326,43 @@ private struct TypingIndicator: View {
     }
 }
 
+// MARK: - Queued message row
+
+private struct QueuedMessageRow: View {
+    let queued: QueuedMessage
+    let onRemove: () -> Void
+
+    var body: some View {
+        let isBottomCard = queued.id == 0
+        HStack(spacing: 8) {
+            Text(queued.text)
+                .font(.caption)
+                .lineLimit(2)
+            Spacer()
+            Image(systemName: "arrow.up")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(.secondary)
+            Button(action: onRemove) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            .secondary.opacity(0.08),
+            in: .rect(
+                topLeadingRadius: 12,
+                bottomLeadingRadius: isBottomCard ? 0 : 12,
+                bottomTrailingRadius: isBottomCard ? 0 : 12,
+                topTrailingRadius: 12
+            )
+        )
+    }
+}
+
 // MARK: - ── Composer ──────────────────────────────────────────────────────────
 
 private struct Composer: View {
@@ -1354,36 +1391,9 @@ private struct Composer: View {
                     if !store.messageQueue.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
                             ForEach(store.queuedMessagesForDisplay) { queued in
-                                let isBottomCard = queued.id == 0
-                                HStack(spacing: 8) {
-                                    Text(queued.text)
-                                        .font(.caption)
-                                        .lineLimit(2)
-                                    Spacer()
-                                    Image(systemName: "arrow.up")
-                                        .font(.system(size: 10, weight: .bold))
-                                        .foregroundStyle(.secondary)
-                                    Button {
-                                        store.removeQueuedMessage(at: queued.id)
-                                    } label: {
-                                        Image(systemName: "xmark")
-                                            .font(.system(size: 10, weight: .bold))
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(
-                                    .secondary.opacity(0.08),
-                                    in: RoundedRectangle(
-                                        cornerRadii: .init(
-                                            topLeading: 12,
-                                            bottomLeading: isBottomCard ? 0 : 12,
-                                            bottomTrailing: isBottomCard ? 0 : 12,
-                                            topTrailing: 12
-                                        )
-                                    )
+                                QueuedMessageRow(
+                                    queued: queued,
+                                    onRemove: { store.removeQueuedMessage(at: queued.id) }
                                 )
                             }
                         }
