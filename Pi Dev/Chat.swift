@@ -1331,6 +1331,7 @@ private struct TypingIndicator: View {
 private struct QueuedMessageRow: View {
     let queued: QueuedMessage
     let onRemove: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         let isBottomCard = queued.id == 0
@@ -1352,13 +1353,24 @@ private struct QueuedMessageRow: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(
-            .secondary.opacity(0.08),
+            colorScheme == .dark
+                ? AnyShapeStyle(.ultraThickMaterial)
+                : AnyShapeStyle(.white),
             in: .rect(
                 topLeadingRadius: 12,
                 bottomLeadingRadius: isBottomCard ? 0 : 12,
                 bottomTrailingRadius: isBottomCard ? 0 : 12,
                 topTrailingRadius: 12
             )
+        )
+        .overlay(
+            .rect(
+                topLeadingRadius: 12,
+                bottomLeadingRadius: isBottomCard ? 0 : 12,
+                bottomTrailingRadius: isBottomCard ? 0 : 12,
+                topTrailingRadius: 12
+            )
+            .stroke(.secondary.opacity(0.25), lineWidth: 0.5)
         )
     }
 }
