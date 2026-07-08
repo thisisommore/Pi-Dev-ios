@@ -538,7 +538,7 @@ private struct ChatDetailView: View {
                             .font(.system(size: 18, weight: .bold))
                             .foregroundStyle(.gray)
                             .frame(width: 44, height: 44)
-                            .background(.white, in: .circle)
+                            .background(.regularMaterial, in: .circle)
                     }
                     .buttonStyle(.plain)
                     .padding(.leading, 16)
@@ -605,7 +605,7 @@ private struct Sidebar: View {
                                         .frame(maxWidth: .infinity, alignment: .leading)
                                     if store.selectedChatId == chat.id {
                                         Circle()
-                                            .fill(.white)
+                                            .fill(.primary)
                                             .frame(width: 6, height: 6)
                                     }
                                 }
@@ -775,7 +775,7 @@ private struct ContextGauge: View {
                     .stroke(.quaternary, lineWidth: 3.5)
                 Circle()
                     .trim(from: 0, to: fraction)
-                    .stroke(.white.gradient, style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
+                    .stroke(.primary.gradient, style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
                     .rotationEffect(.degrees(-90))
             }
             .padding(9)
@@ -985,7 +985,7 @@ private struct ThinkingBlock: View {
                 HStack(spacing: 7) {
                     Image(systemName: "brain")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.secondary)
                         .symbolEffect(.pulse, isActive: false)
                     Text("Thought for \(thinking.seconds)s")
                         .font(.caption.weight(.semibold))
@@ -1138,7 +1138,7 @@ private struct TerminalBlock: View {
                     Spacer()
                     Image(systemName: run.exitCode == 0 ? "checkmark" : "xmark")
                         .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(run.exitCode == 0 ? .white : .red)
+                        .foregroundStyle(run.exitCode == 0 ? .green : .red)
                     Image(systemName: "chevron.down")
                         .font(.system(size: 9, weight: .bold))
                         .rotationEffect(.degrees(expanded ? 180 : 0))
@@ -1160,10 +1160,10 @@ private struct TerminalBlock: View {
                     .transition(.opacity)
             }
         }
-        .background(.black.opacity(0.25), in: .rect(cornerRadius: 16))
+        .background(.secondary.opacity(0.12), in: .rect(cornerRadius: 16))
         .overlay(
             RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(.white.opacity(0.08), lineWidth: 1)
+                .strokeBorder(.secondary.opacity(0.2), lineWidth: 1)
         )
     }
 }
@@ -1200,10 +1200,10 @@ private struct CodeBlock: View {
                     .textSelection(.enabled)
             }
         }
-        .background(.black.opacity(0.22), in: .rect(cornerRadius: 16))
+        .background(.secondary.opacity(0.12), in: .rect(cornerRadius: 16))
         .overlay(
             RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(.white.opacity(0.08), lineWidth: 1)
+                .strokeBorder(.secondary.opacity(0.2), lineWidth: 1)
         )
     }
 }
@@ -1394,7 +1394,7 @@ private struct Composer: View {
                     .padding(.vertical, 6)
                     .padding(.horizontal, 10)
                 }
-                .background(.regularMaterial, in: .rect(cornerRadius: 26))
+                .background(.secondary.opacity(0.12), in: .rect(cornerRadius: 26))
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
             }
@@ -1461,7 +1461,7 @@ private struct Composer: View {
         .frame(width: 150, alignment: .leading)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(.white.opacity(0.12), in: .rect(cornerRadius: 12))
+        .background(.secondary.opacity(0.12), in: .rect(cornerRadius: 12))
     }
 
     private func importFiles(from result: Result<[URL], Error>) {
@@ -1664,7 +1664,7 @@ private struct ModelRow: View {
                 if store.model == model {
                     Image(systemName: "checkmark")
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                 }
             }
             .padding(.horizontal, 20)
@@ -1672,7 +1672,7 @@ private struct ModelRow: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .background(store.model == model ? Color.white.opacity(0.16) : .clear, in: .rect(cornerRadius: 0))
+        .background(store.model == model ? Color.secondary.opacity(0.15) : .clear, in: .rect(cornerRadius: 0))
     }
 }
 
