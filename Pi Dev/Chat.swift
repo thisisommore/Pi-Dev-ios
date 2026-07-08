@@ -1340,37 +1340,38 @@ private struct Composer: View {
                 }
                 .padding(.horizontal, 16)
 
-                // Queued messages appear stacked above the input
-                if !store.messageQueue.isEmpty {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(Array(store.messageQueue.enumerated().reversed()), id: \.offset) { index, message in
-                            HStack(spacing: 8) {
-                                Text(message)
-                                    .font(.caption)
-                                    .lineLimit(2)
-                                Spacer()
-                                Image(systemName: "arrow.up")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundStyle(.secondary)
-                                Button {
-                                    store.removeQueuedMessage(at: index)
-                                } label: {
-                                    Image(systemName: "xmark")
+                VStack(spacing: 0) {
+                    // Queued messages appear stacked above the input
+                    if !store.messageQueue.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ForEach(Array(store.messageQueue.enumerated().reversed()), id: \.offset) { index, message in
+                                HStack(spacing: 8) {
+                                    Text(message)
+                                        .font(.caption)
+                                        .lineLimit(2)
+                                    Spacer()
+                                    Image(systemName: "arrow.up")
                                         .font(.system(size: 10, weight: .bold))
                                         .foregroundStyle(.secondary)
+                                    Button {
+                                        store.removeQueuedMessage(at: index)
+                                    } label: {
+                                        Image(systemName: "xmark")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(.secondary.opacity(0.08), in: .rect(cornerRadius: 12))
                             }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(.secondary.opacity(0.08), in: .rect(cornerRadius: 12))
                         }
+                        .padding(.horizontal, 16)
                     }
-                    .padding(.horizontal, 16)
-                }
 
-                // Input + buttons container
-                VStack(spacing: 0) {
+                    // Input + buttons container
+                    VStack(spacing: 0) {
                     if hasAttachments {
                         HStack {
                             Spacer()
@@ -1511,6 +1512,7 @@ private struct Composer: View {
                 )
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
+            }
             }
         }
         .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.plainText, .sourceCode, .data], allowsMultipleSelection: true) { result in
