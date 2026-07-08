@@ -84,9 +84,7 @@ private struct CopyButton: View {
 
   var body: some View {
     Button {
-      let pasteboard = NSPasteboard.general
-      pasteboard.clearContents()
-      pasteboard.setString(message.text, forType: .string)
+      UIPasteboard.general.string = message.text
       copied = true
       DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
         copied = false
