@@ -54,7 +54,7 @@ struct Sidebar: View {
                   .padding(.horizontal, 0)
                   .padding(.vertical, 18)
 
-                ForEach(group.sessions) { session in
+                ForEach(Array(group.sessions.enumerated()), id: \.element.id) { index, session in
                   Button {
                     Task { @MainActor in
                       await store.select(session: session)
@@ -91,6 +91,12 @@ struct Sidebar: View {
                     } label: {
                       Label("Delete", systemImage: "trash")
                     }
+                  }
+
+                  if index < group.sessions.count - 1 {
+                    Divider()
+                      .opacity(0.5)
+                      .padding(.horizontal, 14)
                   }
                 }
               }
