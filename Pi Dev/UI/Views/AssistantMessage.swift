@@ -38,13 +38,15 @@ struct AssistantMessage: View {
         CodeBlock(language: code.language, source: code.source)
       }
 
-      HStack(spacing: 10) {
-        Text("\(message.tokens.formatted(.number.notation(.compactName))) tok")
-        RetryButton(message: message, store: store)
+      if !message.isStreaming {
+        HStack(spacing: 10) {
+          Text("\(message.tokens.formatted(.number.notation(.compactName))) tok")
+          RetryButton(message: message, store: store)
+        }
+        .font(.caption2)
+        .foregroundStyle(.tertiary)
+        .padding(.top, 2)
       }
-      .font(.caption2)
-      .foregroundStyle(.tertiary)
-      .padding(.top, 2)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(.horizontal, 16)
