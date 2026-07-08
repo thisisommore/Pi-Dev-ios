@@ -41,6 +41,18 @@ final class PiRPCClient {
     try await send(command: ["type": "prompt", "message": message])
   }
 
+  func rerun() async throws {
+    let rerunURL = baseURL.appendingPathComponent("rerun")
+    var request = URLRequest(url: rerunURL)
+    request.httpMethod = "POST"
+
+    let (data, response) = try await urlSession.data(for: request)
+    guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+      let body = String(data: data, encoding: .utf8) ?? ""
+      throw RPCError(command: "rerun", message: "HTTP error: \(body)")
+    }
+  }
+
   func steer(message: String) async throws -> RPCResponse<EmptyResponse> {
     try await send(command: ["type": "steer", "message": message])
   }
@@ -155,6 +167,60 @@ final class PiRPCClient {
           print("[PiRPCClient] prompt RPC failed: \(error.localizedDescription)")
           sseTask.cancel()
           continuation.yield(.extensionError(extensionPath: "PiRPCClient", event: "prompt", error: error.localizedDescription))
+          continuation.finish()
+          return
+        }
+
+        let sseWorked = await sseTask.value
+        print("[PiRPCClient] SSE task returned worked=\(sseWorked)")
+        if !sseWorked {
+          print("[PiRPCClient] falling back to polling")
+          await self.pollUntilDone(into: continuation)
+        }
+        print("[PiRPCClient] finishing stream")
+        continuation.finish()
+      }
+
+      self.setActiveTask(task)
+      continuation.onTermination = { @Sendable _ in
+        print("[PiRPCClient] stream terminated, cancelling task")
+        task.cancel()
+      }
+    }
+    return stream
+  }
+
+  /// Re-runs the last user turn and streams agent events back.
+  ///
+  /// Uses the same SSE/polling fallback as `streamEvents(forPrompt:)`.
+  func streamRerunEvents() -> AsyncStream<AgentEvent> {
+    print("[PiRPCClient] streamRerunEvents start")
+    let stream = AsyncStream<AgentEvent> { continuation in
+      let task = Task { [weak self] in
+        guard let self else {
+          print("[PiRPCClient] streamRerunEvents self deallocated, finishing")
+          continuation.finish()
+          return
+        }
+
+        // Start reading SSE first so we don't miss events that arrive while
+        // the rerun request is in flight.
+        let sseTask = Task { [weak self] in
+          guard let self else {
+            print("[PiRPCClient] readSSE self deallocated")
+            return false
+          }
+          return await self.readSSE(into: continuation)
+        }
+
+        do {
+          print("[PiRPCClient] sending rerun request")
+          try await self.rerun()
+          print("[PiRPCClient] rerun request accepted")
+        } catch {
+          print("[PiRPCClient] rerun request failed: \(error.localizedDescription)")
+          sseTask.cancel()
+          continuation.yield(.extensionError(extensionPath: "PiRPCClient", event: "rerun", error: error.localizedDescription))
           continuation.finish()
           return
         }

@@ -258,15 +258,13 @@ final class ChatStore: Identifiable {
           assistantIndex > 0,
           messages[assistantIndex - 1].role == .user else { return }
 
-    let userText = messages[assistantIndex - 1].text
-
     withAnimation(.snappy) {
       messages.removeSubrange(assistantIndex...)
       isResponding = true
     }
 
     Task { @MainActor in
-      await streamReply(for: userText)
+      await streamRerun()
     }
   }
 
@@ -296,6 +294,29 @@ final class ChatStore: Identifiable {
       print("[ChatStore] setThinkingLevel failed: \(error.localizedDescription)")
     }
 
+    await consumeStreamEvents(rpcClient.streamEvents(forPrompt: userText), at: messageIndex)
+  }
+
+  private func streamRerun() async {
+    let messageIndex = self.messages.count
+    print("[ChatStore] streamRerun start index=\(messageIndex)")
+
+    withAnimation(.snappy) {
+      self.messages.append(ChatMessage(role: .assistant, text: "", tokens: 0, isStreaming: true))
+      self.isResponding = false
+    }
+    print("[ChatStore] appended streaming assistant message at index=\(messageIndex)")
+
+    do {
+      try await rpcClient.setThinkingLevel(thinkingLevel)
+    } catch {
+      print("[ChatStore] setThinkingLevel failed: \(error.localizedDescription)")
+    }
+
+    await consumeStreamEvents(rpcClient.streamRerunEvents(), at: messageIndex)
+  }
+
+  private func consumeStreamEvents(_ events: AsyncStream<AgentEvent>, at messageIndex: Int) async {
     var latestToolNames: [String: String] = [:]
     var thinkingStartTime: Date?
 
@@ -311,7 +332,7 @@ final class ChatStore: Identifiable {
     }
 
     print("[ChatStore] entering event loop")
-    for await event in rpcClient.streamEvents(forPrompt: userText) {
+    for await event in events {
       print("[ChatStore] received event: \(event.debugName)")
       guard self.messages.indices.contains(messageIndex) else {
         print("[ChatStore] message index \(messageIndex) out of range, breaking")
