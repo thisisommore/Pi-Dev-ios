@@ -118,7 +118,7 @@ struct Composer: View {
                   }
                 }
               } label: {
-                PillLabel(symbol: "brain", text: " \(store.thinkingLevel.rawValue)")
+                PillLabel(symbol: nil, text: store.thinkingLevel.rawValue)
               }
               .buttonStyle(.plain)
               .glassEffect(.regular.interactive(), in: .capsule)
