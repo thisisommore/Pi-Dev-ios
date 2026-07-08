@@ -1356,15 +1356,17 @@ private struct QueuedMessageRow: View {
             colorScheme == .dark
                 ? AnyShapeStyle(.ultraThickMaterial)
                 : AnyShapeStyle(.white),
-            in: .rect(
-                topLeadingRadius: 12,
-                bottomLeadingRadius: isBottomCard ? 0 : 12,
-                bottomTrailingRadius: isBottomCard ? 0 : 12,
-                topTrailingRadius: 12
+            in: UnevenRoundedRectangle(
+                cornerRadii: .init(
+                    topLeading: 12,
+                    bottomLeading: isBottomCard ? 0 : 12,
+                    bottomTrailing: isBottomCard ? 0 : 12,
+                    topTrailing: 12
+                )
             )
         )
         .overlay(
-            RoundedRectangle(
+            UnevenRoundedRectangle(
                 cornerRadii: .init(
                     topLeading: 12,
                     bottomLeading: isBottomCard ? 0 : 12,
