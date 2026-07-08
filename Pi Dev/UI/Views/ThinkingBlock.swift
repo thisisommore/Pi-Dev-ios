@@ -10,31 +10,27 @@ struct ThinkingBlock: View {
   @State private var showSheet = false
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      Button {
-        withAnimation(.snappy) { showSheet = true }
-      } label: {
+    Button {
+      withAnimation(.snappy) { showSheet = true }
+    } label: {
+      VStack(alignment: .leading, spacing: 8) {
         HStack(spacing: 7) {
           Image(systemName: "brain")
             .font(.system(size: 11, weight: .semibold))
             .foregroundStyle(.secondary)
             .symbolEffect(.pulse, isActive: false)
           Spacer()
-          Image(systemName: "chevron.down")
-            .font(.system(size: 10, weight: .bold))
-            .rotationEffect(.degrees(showSheet ? 180 : 0))
-            .foregroundStyle(.secondary)
         }
-        .contentShape(.rect)
-      }
-      .buttonStyle(.plain)
 
-      Text(thinking.summary)
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .lineLimit(2)
+        Text(thinking.summary)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .lineLimit(2)
+      }
+      .padding(.vertical, 8)
+      .contentShape(.rect)
     }
-    .padding(.vertical, 8)
+    .buttonStyle(.plain)
     .sheet(isPresented: $showSheet) {
       ThinkingSheet(thinking: thinking)
         .presentationDetents([.large])
