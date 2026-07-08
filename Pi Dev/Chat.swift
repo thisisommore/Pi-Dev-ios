@@ -144,6 +144,11 @@ struct ChatMessage: Identifiable {
     var isStreaming: Bool = false
 }
 
+struct QueuedMessage: Identifiable {
+    let id: Int
+    let text: String
+}
+
 // MARK: - ── Store (fake state) ─────────────────────────────────────────────────
 
 @Observable
@@ -170,8 +175,8 @@ final class ChatStore: Identifiable {
 
     var isStreaming: Bool { messages.contains { $0.isStreaming } }
 
-    var queuedMessageIndices: [Int] {
-        Array((0..<messageQueue.count).reversed())
+    var queuedMessagesForDisplay: [QueuedMessage] {
+        messageQueue.enumerated().reversed().map { QueuedMessage(id: $0.offset, text: $0.element) }
     }
 
     func newChat() {
@@ -1348,11 +1353,10 @@ private struct Composer: View {
                     // Queued messages appear stacked above the input
                     if !store.messageQueue.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
-                            ForEach(store.queuedMessageIndices, id: \.self) { index in
-                                let message = store.messageQueue[index]
-                                let isBottomCard = index == 0
+                            ForEach(store.queuedMessagesForDisplay) { queued in
+                                let isBottomCard = queued.id == 0
                                 HStack(spacing: 8) {
-                                    Text(message)
+                                    Text(queued.text)
                                         .font(.caption)
                                         .lineLimit(2)
                                     Spacer()
@@ -1360,7 +1364,7 @@ private struct Composer: View {
                                         .font(.system(size: 10, weight: .bold))
                                         .foregroundStyle(.secondary)
                                     Button {
-                                        store.removeQueuedMessage(at: index)
+                                        store.removeQueuedMessage(at: queued.id)
                                     } label: {
                                         Image(systemName: "xmark")
                                             .font(.system(size: 10, weight: .bold))
