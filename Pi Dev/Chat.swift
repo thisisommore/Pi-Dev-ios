@@ -280,6 +280,13 @@ final class ChatStore: Identifiable {
         sendNow(next)
     }
 
+    func removeQueuedMessage(at index: Int) {
+        guard messageQueue.indices.contains(index) else { return }
+        withAnimation(.snappy) {
+            messageQueue.remove(at: index)
+        }
+    }
+
     func retry(from assistantMessageId: UUID) {
         guard let assistantIndex = messages.firstIndex(where: { $0.id == assistantMessageId }),
               assistantIndex > 0,
@@ -1394,9 +1401,7 @@ private struct Composer: View {
                                         .font(.system(size: 10, weight: .bold))
                                         .foregroundStyle(.secondary)
                                     Button {
-                                        withAnimation(.snappy) {
-                                            store.messageQueue.remove(at: index)
-                                        }
+                                        store.removeQueuedMessage(at: index)
                                     } label: {
                                         Image(systemName: "xmark")
                                             .font(.system(size: 10, weight: .bold))
