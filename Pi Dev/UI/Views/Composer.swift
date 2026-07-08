@@ -126,7 +126,7 @@ struct Composer: View {
               Button {
                 showModelSheet = true
               } label: {
-                PillLabel(symbol: nil, text: store.model.rawValue)
+                PillLabel(symbol: nil, text: store.selectedModel?.name ?? "Model")
               }
               .buttonStyle(.plain)
               .glassEffect(.regular.interactive(), in: .capsule)

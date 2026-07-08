@@ -9,13 +9,19 @@ struct ChatDetailView: View {
   @Bindable var store: ChatStore
   @State private var showModelSheet = false
   @Binding var showSidebar: Bool
+  var onNewChat: () -> Void = {}
 
   var body: some View {
     ZStack {
       Background()
 
       VStack(spacing: 0) {
-        Header(store: store, showModelSheet: $showModelSheet, showSidebar: $showSidebar)
+        Header(
+          store: store,
+          showModelSheet: $showModelSheet,
+          showSidebar: $showSidebar,
+          onNewChat: onNewChat
+        )
         MessageList(store: store)
       }
       .contentShape(.rect)

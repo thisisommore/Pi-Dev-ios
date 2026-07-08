@@ -9,6 +9,7 @@ struct Header: View {
   @Bindable var store: ChatStore
   @Binding var showModelSheet: Bool
   @Binding var showSidebar: Bool
+  var onNewChat: () -> Void = {}
   @State private var showRenameAlert = false
   @State private var renameDraft = ""
 
@@ -59,13 +60,13 @@ struct Header: View {
         ContextGauge(
           fraction: store.contextFraction,
           used: store.usedTokens,
-          window: store.model.contextWindow
+          window: store.selectedModel?.contextWindow ?? 200_000
         )
         .frame(width: 44, height: 44)
         .glassEffect(.regular)
 
         Button {
-          store.newChat()
+          onNewChat()
         } label: {
           Image(systemName: "square.and.pencil")
             .font(.system(size: 17, weight: .semibold))

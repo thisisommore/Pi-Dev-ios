@@ -16,7 +16,7 @@ struct ModelSheet: View {
         .frame(maxWidth: .infinity)
         .padding(.top, 10)
 
-      ModelList(store: store, models: AIModel.allCases)
+      ModelList(store: store, models: store.availableModels)
 
       Spacer(minLength: 0)
     }
@@ -25,17 +25,24 @@ struct ModelSheet: View {
 
 struct ModelList: View {
   @Bindable var store: ChatStore
-  let models: [AIModel]
+  let models: [AgentModel]
 
   var body: some View {
     ScrollView(showsIndicators: false) {
       VStack(spacing: 0) {
-        ForEach(models) { model in
-          ModelRow(store: store, model: model)
+        if models.isEmpty {
+          Text("No models available")
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, minHeight: 80)
+        } else {
+          ForEach(models, id: \.id) { model in
+            ModelRow(store: store, model: model)
 
-          if model != models.last {
-            Divider()
-              .padding(.leading, 20)
+            if model.id != models.last?.id {
+              Divider()
+                .padding(.leading, 20)
+            }
           }
         }
       }
@@ -50,18 +57,27 @@ struct ModelList: View {
 struct ModelRow: View {
   @Bindable var store: ChatStore
   @Environment(\.dismiss) private var dismiss
-  let model: AIModel
+  let model: AgentModel
 
   var body: some View {
     Button {
-      withAnimation(.snappy) { store.model = model }
-      dismiss()
+      Task { @MainActor in
+        await store.selectModel(model)
+        dismiss()
+      }
     } label: {
       HStack {
-        Text(model.rawValue)
-          .font(.subheadline.weight(.semibold))
+        VStack(alignment: .leading, spacing: 2) {
+          Text(model.name)
+            .font(.subheadline.weight(.semibold))
+          if let contextWindow = model.contextWindow {
+            Text("\(contextWindow.formatted(.number.notation(.compactName))) context")
+              .font(.caption2)
+              .foregroundStyle(.secondary)
+          }
+        }
         Spacer()
-        if store.model == model {
+        if store.selectedModel?.id == model.id {
           Image(systemName: "checkmark")
             .font(.system(size: 14, weight: .bold))
             .foregroundStyle(.primary)
@@ -72,6 +88,6 @@ struct ModelRow: View {
       .contentShape(.rect)
     }
     .buttonStyle(.plain)
-    .background(store.model == model ? Color.secondary.opacity(0.15) : .clear)
+    .background(store.selectedModel?.id == model.id ? Color.secondary.opacity(0.15) : .clear)
   }
 }

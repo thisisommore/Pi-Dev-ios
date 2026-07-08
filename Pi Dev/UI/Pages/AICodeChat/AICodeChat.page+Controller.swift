@@ -11,7 +11,8 @@ import SwiftUI
 final class ChatStore: Identifiable {
   let id = UUID()
   var messages: [ChatMessage] = []
-  var model: AIModel = .fable
+  var selectedModel: AgentModel? = nil
+  var availableModels: [AgentModel] = []
   var thinkingLevel: ThinkingLevel = .high
   var usedTokens: Int = 0
   var draft: String = ""
@@ -22,8 +23,10 @@ final class ChatStore: Identifiable {
   var contextFiles: [ContextFile] = []
   var messageQueue: [String] = []
 
+  private let rpcClient = PiRPCClient()
+
   var contextFraction: Double {
-    min(1, Double(usedTokens) / Double(model.contextWindow))
+    min(1, Double(usedTokens) / Double(selectedModel?.contextWindow ?? 200_000))
   }
 
   var isStreaming: Bool { messages.contains { $0.isStreaming } }
@@ -32,7 +35,114 @@ final class ChatStore: Identifiable {
     messageQueue.enumerated().reversed().map { QueuedMessage(id: $0.offset, text: $0.element) }
   }
 
-  init() { AICodeChatMock.seed(into: self) }
+  init() {
+    Task { @MainActor in
+      await loadAvailableModels()
+    }
+  }
+
+  func loadAvailableModels() async {
+    do {
+      let response = try await rpcClient.getAvailableModels()
+      if let models = response.data?.models, !models.isEmpty {
+        withAnimation(.snappy) {
+          self.availableModels = models
+          if self.selectedModel == nil {
+            self.selectedModel = models.first
+          }
+        }
+      }
+    } catch {
+      // Server may not expose this command; leave the list empty.
+    }
+  }
+
+  func selectModel(_ model: AgentModel) async {
+    do {
+      _ = try await rpcClient.setModel(provider: model.provider ?? "", modelId: model.id)
+      await MainActor.run {
+        withAnimation(.snappy) { self.selectedModel = model }
+      }
+    } catch {
+      await MainActor.run {
+        withAnimation(.snappy) { self.selectedModel = model }
+      }
+    }
+  }
+
+  func resetToSession(title: String) async {
+    await MainActor.run {
+      withAnimation(.snappy) {
+        messages = []
+        usedTokens = 0
+        chatTitle = title
+        isResponding = false
+        draft = ""
+        editingMessageId = nil
+        pastedItems = []
+        contextFiles = []
+        messageQueue = []
+      }
+    }
+  }
+
+  func loadMessages() async {
+    do {
+      let response = try await rpcClient.getMessages()
+      guard let agentMessages = response.data?.messages else { return }
+
+      let chatMessages = agentMessages.compactMap { agentMessage -> ChatMessage? in
+        guard let role = agentMessage.role else { return nil }
+        let text = agentMessage.content?.textBlocks().joined(separator: "\n\n") ?? ""
+
+        if role == "user" {
+          return ChatMessage(role: .user, text: text, tokens: 0)
+        } else if role == "assistant" {
+          var message = ChatMessage(role: .assistant, text: text, tokens: 0)
+          self.populate(message: &message, from: agentMessage)
+          return message
+        }
+        return nil
+      }
+
+      let state = try await rpcClient.getState()
+      await MainActor.run {
+        withAnimation(.snappy) {
+          self.messages = chatMessages
+          self.usedTokens = chatMessages.reduce(0) { $0 + $1.tokens }
+          if let model = state.data?.model {
+            self.selectedModel = model
+          }
+          if let levelString = state.data?.thinkingLevel,
+             let level = ThinkingLevel(rawValue: levelString.capitalized) {
+            self.thinkingLevel = level
+          }
+        }
+      }
+    } catch {
+      // Leave messages empty if the server is unreachable.
+    }
+  }
+
+  private func populate(message: inout ChatMessage, from agentMessage: AgentMessage) {
+    if let usage = agentMessage.usage {
+      message.tokens = usage.totalTokens ?? ((usage.input ?? 0) + (usage.output ?? 0))
+    }
+
+    if let thinkingText = agentMessage.content?.thinkingBlocks().joined(separator: "\n\n"), !thinkingText.isEmpty {
+      message.thinking = Thinking(summary: thinkingText, truncated: thinkingText, full: thinkingText, seconds: 0)
+    }
+
+    let toolCalls = agentMessage.content?.toolCalls() ?? []
+    message.tools = toolCalls.map { call in
+      let detail = call.arguments?.map { "\($0.key): \($0.value.value)" }.joined(separator: "\n") ?? ""
+      return ToolUse(kind: toolKind(for: call.name), name: call.name, detail: detail, symbol: toolSymbol(for: call.name))
+    }
+
+    let (textWithoutCode, code) = stripFirstCodeBlock(from: message.text)
+    message.code = code
+    message.text = textWithoutCode.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
 
   func newChat() {
     withAnimation(.snappy) {
@@ -84,7 +194,7 @@ final class ChatStore: Identifiable {
 
     if let id = editingMessageId {
       if let index = messages.firstIndex(where: { $0.id == id }) {
-        messages[index].text = trimmed
+        updateMessage(at: index) { $0.text = trimmed }
       }
       withAnimation(.snappy) {
         editingMessageId = nil
@@ -169,65 +279,193 @@ final class ChatStore: Identifiable {
     startEditing(message: userMessage)
   }
 
+
   private func streamReply(for userText: String) async {
-    try? await Task.sleep(for: .seconds(0.6))
-
-    let reply = AICodeChatMock.cannedReply(level: self.thinkingLevel)
     let messageIndex = self.messages.count
+    print("[ChatStore] streamReply start index=\(messageIndex)")
 
-    await MainActor.run {
-      withAnimation(.snappy) {
-        self.messages.append(ChatMessage(role: .assistant, text: "", tokens: 0, isStreaming: true))
-        self.isResponding = false
-      }
+    withAnimation(.snappy) {
+      self.messages.append(ChatMessage(role: .assistant, text: "", tokens: 0, isStreaming: true))
+      self.isResponding = false
+    }
+    print("[ChatStore] appended streaming assistant message at index=\(messageIndex)")
+
+    do {
+      try await rpcClient.setThinkingLevel(thinkingLevel)
+    } catch {
+      print("[ChatStore] setThinkingLevel failed: \(error.localizedDescription)")
     }
 
-    if let thinking = reply.thinking {
-      guard self.messages.indices.contains(messageIndex) else { return }
-      await MainActor.run {
-        self.messages[messageIndex].thinking = Thinking(
-          summary: "",
-          truncated: thinking.truncated,
-          full: thinking.full,
-          seconds: thinking.seconds
-        )
+    var latestToolNames: [String: String] = [:]
+
+    print("[ChatStore] entering event loop")
+    for await event in rpcClient.streamEvents(forPrompt: userText) {
+      print("[ChatStore] received event: \(event.debugName)")
+      guard self.messages.indices.contains(messageIndex) else {
+        print("[ChatStore] message index \(messageIndex) out of range, breaking")
+        break
       }
-      await Self.stream(text: thinking.summary) { partial in
-        if self.messages.indices.contains(messageIndex) {
-          self.messages[messageIndex].thinking?.summary = partial
+
+      switch event {
+      case .agentStart:
+        updateMessage(at: messageIndex) { $0.isStreaming = true }
+
+      case .messageStart:
+        updateMessage(at: messageIndex) { $0.isStreaming = true }
+
+      case .messageUpdate(_, let delta):
+        switch delta {
+        case .textDelta(_, let text):
+          print("[ChatStore] textDelta: '\(text.prefix(80))'")
+          updateMessage(at: messageIndex) { $0.text += text }
+        case .thinkingStart:
+          updateMessage(at: messageIndex) {
+            if $0.thinking == nil {
+              $0.thinking = Thinking(summary: "", truncated: "", full: "", seconds: 0)
+            }
+          }
+        case .thinkingDelta(_, let text):
+          updateMessage(at: messageIndex) {
+            if $0.thinking == nil {
+              $0.thinking = Thinking(summary: "", truncated: "", full: "", seconds: 0)
+            }
+            $0.thinking?.summary += text
+            $0.thinking?.full += text
+          }
+        case .toolCallEnd(_, let call):
+          let detail = call.arguments?.map { "\($0.key): \($0.value.value)" }.joined(separator: "\n") ?? ""
+          updateMessage(at: messageIndex) {
+            $0.tools.append(
+              ToolUse(
+                kind: toolKind(for: call.name),
+                name: call.name,
+                detail: detail,
+                symbol: toolSymbol(for: call.name)
+              )
+            )
+          }
+          if let id = call.id { latestToolNames[id] = call.name }
+        default:
+          break
         }
+
+      case .toolExecutionEnd(let toolCallId, let toolName, let result, let isError):
+        let name = latestToolNames[toolCallId] ?? toolName
+        if name == "bash" {
+          let command = result.details?["command"]?.value as? String ?? ""
+          let exitCode = (result.details?["exitCode"]?.value as? Int) ?? (isError ? 1 : 0)
+          updateMessage(at: messageIndex) {
+            $0.terminal.append(TerminalRun(command: command, output: result.textOutput, exitCode: exitCode))
+          }
+        }
+
+      case .messageEnd(let message):
+        print("[ChatStore] messageEnd")
+        finalize(message: message, at: messageIndex)
+
+      case .agentEnd(let messages):
+        print("[ChatStore] agentEnd messages.count=\(messages.count)")
+        if let last = messages.last(where: { $0.role == "assistant" }) {
+          finalize(message: last, at: messageIndex)
+        } else {
+          updateMessage(at: messageIndex) { $0.isStreaming = false }
+        }
+
+      case .autoRetryStart(let attempt, _, _, let errorMessage):
+        updateMessage(at: messageIndex) {
+          if $0.thinking == nil {
+            $0.thinking = Thinking(summary: "", truncated: "", full: "", seconds: 0)
+          }
+          $0.thinking?.summary += "\n[Retry \(attempt): \(errorMessage)]"
+        }
+
+      case .extensionError(_, _, let error):
+        updateMessage(at: messageIndex) {
+          if $0.text.isEmpty {
+            $0.text = "⚠️ \(error)"
+          }
+        }
+
+      default:
+        break
       }
-      try? await Task.sleep(for: .milliseconds(300))
     }
 
-    await Self.stream(text: reply.text) { partial in
-      if self.messages.indices.contains(messageIndex) {
-        self.messages[messageIndex].text = partial
-      }
+    print("[ChatStore] event loop ended")
+    guard self.messages.indices.contains(messageIndex) else {
+      print("[ChatStore] final check: index \(messageIndex) out of range")
+      return
     }
-
-    guard self.messages.indices.contains(messageIndex) else { return }
-    await MainActor.run {
-      withAnimation(.snappy) {
-        self.messages[messageIndex].code = reply.code
-        self.messages[messageIndex].terminal = reply.terminal
-        self.messages[messageIndex].tokens = reply.tokens
-        self.messages[messageIndex].isStreaming = false
-        self.usedTokens += reply.tokens
-      }
+    if self.messages[messageIndex].isStreaming {
+      print("[ChatStore] forcing isStreaming=false at end")
+      updateMessage(at: messageIndex) { $0.isStreaming = false }
     }
-
+    print("[ChatStore] final message text='\(self.messages[messageIndex].text.prefix(80))' streaming=\(self.messages[messageIndex].isStreaming)")
     processQueue()
   }
 
-  private static func stream(text: String, update: @escaping (String) -> Void) async {
-    var partial = ""
-    for char in text {
-      partial.append(char)
-      await MainActor.run { [partial] in
-        update(partial)
-      }
-      try? await Task.sleep(for: .milliseconds(12))
+  private func updateMessage(at index: Int, _ update: (inout ChatMessage) -> Void) {
+    guard self.messages.indices.contains(index) else {
+      print("[ChatStore] updateMessage index \(index) out of range")
+      return
+    }
+    var message = self.messages[index]
+    let oldText = message.text
+    update(&message)
+    self.messages[index] = message
+    if message.text != oldText {
+      print("[ChatStore] updateMessage index=\(index) text changed '\(oldText.prefix(40))' -> '\(message.text.prefix(40))'")
+    } else {
+      print("[ChatStore] updateMessage index=\(index) (no text change)")
+    }
+  }
+
+  private func finalize(message: AgentMessage, at index: Int) {
+    guard self.messages.indices.contains(index) else { return }
+
+    let assistantText = message.content?.textBlocks().joined(separator: "\n\n") ?? self.messages[index].text
+    let (textWithoutCode, code) = stripFirstCodeBlock(from: assistantText)
+
+    let tokenCount = message.usage?.totalTokens ?? ((message.usage?.input ?? 0) + (message.usage?.output ?? 0))
+    updateMessage(at: index) { message in
+      message.text = textWithoutCode.trimmingCharacters(in: .whitespacesAndNewlines)
+      message.code = code
+      message.isStreaming = false
+      message.tokens = tokenCount
+    }
+    self.usedTokens += tokenCount
+  }
+
+  private func stripFirstCodeBlock(from text: String) -> (text: String, code: (language: String, source: String)?) {
+    guard let startRange = text.range(of: "```\\n?([^\\n]*)\\n", options: .regularExpression) else {
+      return (text, nil)
+    }
+    let fence = String(text[startRange])
+    let language = fence.trimmingCharacters(in: CharacterSet(charactersIn: "`\n"))
+    let afterFence = text[startRange.upperBound...]
+    guard let endRange = afterFence.range(of: "\n```") else { return (text, nil) }
+    let source = String(afterFence[..<endRange.lowerBound])
+    let code: (language: String, source: String) = (language.isEmpty ? "text" : language, source)
+    let textBefore = String(text[..<startRange.lowerBound])
+    let textAfter = String(afterFence[endRange.upperBound...])
+    let remaining = textBefore + textAfter
+    return (remaining, code)
+  }
+
+  private func toolKind(for name: String) -> ToolKind {
+    if name.hasPrefix("mcp/") || name.lowercased().contains("mcp") { return .mcp }
+    if name.hasPrefix("skill/") || name.lowercased().contains("skill") { return .skill }
+    return .builtin
+  }
+
+  private func toolSymbol(for name: String) -> String {
+    switch name.lowercased() {
+    case let n where n.contains("search"): return "magnifyingglass"
+    case let n where n.contains("edit") || n.contains("write"): return "pencil.line"
+    case let n where n.contains("read"): return "doc.text"
+    case let n where n.contains("bash") || n.contains("run"): return "terminal"
+    case let n where n.contains("test"): return "checkmark.seal"
+    default: return "gearshape.2"
     }
   }
 }
@@ -235,45 +473,96 @@ final class ChatStore: Identifiable {
 @MainActor
 @Observable
 final class SidebarStore {
-  var chats: [ChatStore] = []
-  var selectedChatId: UUID? = nil
+  var sessions: [SessionInfo] = []
+  var selectedSessionId: String? = nil
+  var activeChat = ChatStore()
   var searchText = ""
 
+  private let rpcClient = PiRPCClient()
+
   init() {
-    chats = AICodeChatMock.chatTitles.map { title in
-      let chat = ChatStore()
-      chat.chatTitle = title
-      return chat
+    Task { @MainActor in
+      await loadSessions()
+      await syncActiveSession()
     }
-    selectedChatId = chats.first?.id
   }
 
-  var filteredChats: [ChatStore] {
+  var filteredSessions: [SessionInfo] {
     let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-    if query.isEmpty { return chats }
-    return chats.filter { $0.chatTitle.lowercased().contains(query) }
+    if query.isEmpty { return sessions }
+    return sessions.filter { sessionTitle($0).lowercased().contains(query) }
   }
 
-  func newChat() {
-    let chat = ChatStore()
-    withAnimation(.snappy) {
-      chats.append(chat)
-      selectedChatId = chat.id
+  func sessionTitle(_ session: SessionInfo) -> String {
+    let text = session.firstMessage ?? "New chat"
+    return String(text.prefix(34))
+  }
+
+  func loadSessions() async {
+    do {
+      let sessions = try await rpcClient.listSessions()
+      await MainActor.run {
+        withAnimation(.snappy) {
+          self.sessions = sessions.sorted { $0.modified > $1.modified }
+          if self.selectedSessionId == nil, let first = sessions.first {
+            self.selectedSessionId = first.id
+          }
+        }
+      }
+    } catch {
+      // Leave the list empty if the server is unreachable.
     }
   }
 
-  func select(chatId: UUID) {
-    withAnimation(.snappy) {
-      selectedChatId = chatId
+  func select(session: SessionInfo) async {
+    guard session.id != selectedSessionId else { return }
+
+    await MainActor.run {
+      withAnimation(.snappy) { selectedSessionId = session.id }
+    }
+
+    do {
+      _ = try await rpcClient.switchSession(path: session.path)
+      await activeChat.resetToSession(title: sessionTitle(session))
+      await activeChat.loadMessages()
+    } catch {
+      await activeChat.resetToSession(title: sessionTitle(session))
     }
   }
 
-  func delete(chatId: UUID) {
-    withAnimation(.snappy) {
-      chats.removeAll { $0.id == chatId }
-      if selectedChatId == chatId {
-        selectedChatId = chats.last?.id
+  func newChat() async {
+    do {
+      _ = try await rpcClient.newSession()
+      await activeChat.resetToSession(title: "New chat")
+      await loadSessions()
+      await MainActor.run {
+        withAnimation(.snappy) { selectedSessionId = sessions.first?.id }
+      }
+    } catch {
+      await activeChat.resetToSession(title: "New chat")
+    }
+  }
+
+  func delete(session: SessionInfo) async {
+    // The π RPC protocol does not expose a delete-session command.
+    // Remove it from the local list only.
+    let wasSelected = session.id == selectedSessionId
+    await MainActor.run {
+      withAnimation(.snappy) {
+        sessions.removeAll { $0.id == session.id }
+        if wasSelected {
+          selectedSessionId = sessions.first?.id
+        }
       }
     }
+    if wasSelected, let next = sessions.first {
+      await select(session: next)
+    }
+  }
+
+  private func syncActiveSession() async {
+    guard let session = sessions.first(where: { $0.id == selectedSessionId }) else { return }
+    await activeChat.resetToSession(title: sessionTitle(session))
+    await activeChat.loadMessages()
   }
 }

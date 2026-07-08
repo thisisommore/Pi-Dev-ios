@@ -17,13 +17,16 @@ struct AICodeChatView: View {
           .frame(maxWidth: .infinity, alignment: .leading)
 
         ZStack {
-          if let selectedChat = sidebarStore.chats.first(where: { $0.id == sidebarStore.selectedChatId }) {
-            ChatDetailView(store: selectedChat, showSidebar: $showSidebar)
-              .frame(maxWidth: .infinity, maxHeight: .infinity)
-          } else {
-            EmptyChatView()
-              .frame(maxWidth: .infinity, maxHeight: .infinity)
-          }
+          ChatDetailView(
+            store: sidebarStore.activeChat,
+            showSidebar: $showSidebar,
+            onNewChat: {
+              Task { @MainActor in
+                await sidebarStore.newChat()
+              }
+            }
+          )
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
 
           Color.black.opacity(showSidebar ? 0.25 : 0)
             .ignoresSafeArea()
@@ -38,7 +41,7 @@ struct AICodeChatView: View {
         .offset(x: showSidebar ? geometry.size.width * 0.8 : 0)
         .animation(.snappy, value: showSidebar)
       }
-      .onChange(of: sidebarStore.selectedChatId) { _, _ in
+      .onChange(of: sidebarStore.selectedSessionId) { _, _ in
         withAnimation(.snappy) {
           showSidebar = false
         }

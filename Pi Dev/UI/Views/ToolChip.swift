@@ -60,7 +60,7 @@ struct DiffLabel: View {
 
   var body: some View {
     HStack(spacing: 4) {
-      ForEach(parts, id: \.self) { part in
+      ForEach(Array(parts.enumerated()), id: \.offset) { _, part in
         Text(part)
           .foregroundStyle(color(for: part))
       }
