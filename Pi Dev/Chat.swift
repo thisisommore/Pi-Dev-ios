@@ -1413,7 +1413,7 @@ private struct Composer: View {
                                 )
                             }
                         }
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal, 34)
                     }
 
                     // Input + buttons container
