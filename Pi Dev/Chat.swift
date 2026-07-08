@@ -170,6 +170,10 @@ final class ChatStore: Identifiable {
 
     var isStreaming: Bool { messages.contains { $0.isStreaming } }
 
+    var queuedMessageIndices: [Int] {
+        Array((0..<messageQueue.count).reversed())
+    }
+
     func newChat() {
         withAnimation(.snappy) {
             messages = []
@@ -1344,7 +1348,7 @@ private struct Composer: View {
                     // Queued messages appear stacked above the input
                     if !store.messageQueue.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
-                            ForEach((0..<store.messageQueue.count).map { store.messageQueue.count - 1 - $0 }, id: \.self) { index in
+                            ForEach(store.queuedMessageIndices, id: \.self) { index in
                                 let message = store.messageQueue[index]
                                 let isBottomCard = index == 0
                                 HStack(spacing: 8) {
