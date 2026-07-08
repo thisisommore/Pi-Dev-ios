@@ -48,15 +48,6 @@ enum AIModel: String, CaseIterable, Identifiable {
         case .haiku:  200_000
         }
     }
-
-    var tint: Color {
-        switch self {
-        case .fable:  .purple
-        case .opus:   .indigo
-        case .sonnet: .teal
-        case .haiku:  .orange
-        }
-    }
 }
 
 enum ThinkingLevel: String, CaseIterable, Identifiable {
@@ -815,7 +806,7 @@ private struct MessageList: View {
                                     removal: .opacity))
                         }
                         if store.isResponding {
-                            TypingIndicator(tint: store.model.tint)
+                            TypingIndicator(tint: appColor)
                                 .id("typing")
                                 .transition(.opacity)
                         }
@@ -1391,7 +1382,7 @@ private struct Composer: View {
                                 .background(
                                     store.draft.isEmpty
                                         ? AnyShapeStyle(.gray.opacity(0.4))
-                                        : AnyShapeStyle(store.model.tint.gradient),
+                                    : AnyShapeStyle(appColor.gradient),
                                     in: .circle
                                 )
                         }
