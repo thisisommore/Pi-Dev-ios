@@ -1395,6 +1395,10 @@ private struct Composer: View {
                     .padding(.horizontal, 10)
                 }
                 .background(.ultraThickMaterial, in: .rect(cornerRadius: 26))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 26)
+                        .stroke(.secondary.opacity(0.25), lineWidth: 0.5)
+                )
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
             }
