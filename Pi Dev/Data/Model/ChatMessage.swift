@@ -9,6 +9,7 @@ struct ChatMessage: Identifiable {
   enum Role { case user, assistant }
 
   let id = UUID()
+  var entryId: String? = nil
   let role: Role
   var text: String
   var code: (language: String, source: String)? = nil

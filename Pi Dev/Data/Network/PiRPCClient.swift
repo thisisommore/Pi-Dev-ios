@@ -37,20 +37,39 @@ final class PiRPCClient {
 
   // MARK: - Typed commands
 
-  func prompt(message: String) async throws -> RPCResponse<EmptyResponse> {
+  func prompt(message: String) async throws -> RPCResponse<PromptResponse> {
     try await send(command: ["type": "prompt", "message": message])
   }
 
-  func rerun() async throws {
+  func rerun(message: String? = nil, entryId: String? = nil) async throws -> String? {
     let rerunURL = baseURL.appendingPathComponent("rerun")
     var request = URLRequest(url: rerunURL)
     request.httpMethod = "POST"
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+    var body: [String: Any] = [:]
+    if let message { body["message"] = message }
+    if let entryId { body["entryId"] = entryId }
+    if !body.isEmpty {
+      request.httpBody = try JSONSerialization.data(withJSONObject: body)
+    }
+
+    print("[PiRPCClient] rerun request: \(rerunURL)")
+    if let message { print("[PiRPCClient] rerun message: \(message.prefix(200))") }
+    if let entryId { print("[PiRPCClient] rerun entryId: \(entryId)") }
+    let payloadString = request.httpBody.flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+    print("[PiRPCClient] rerun payload: \(payloadString)")
 
     let (data, response) = try await urlSession.data(for: request)
+    let responseBody = String(data: data, encoding: .utf8) ?? ""
+    print("[PiRPCClient] rerun response body: \(responseBody)")
     guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
-      let body = String(data: data, encoding: .utf8) ?? ""
-      throw RPCError(command: "rerun", message: "HTTP error: \(body)")
+      throw RPCError(command: "rerun", message: "HTTP error: \(responseBody)")
     }
+    print("[PiRPCClient] rerun response status: \(httpResponse.statusCode)")
+
+    let rerunResponse = try? JSONDecoder().decode(RerunResponse.self, from: data)
+    return rerunResponse?.entryId
   }
 
   func steer(message: String) async throws -> RPCResponse<EmptyResponse> {
@@ -67,6 +86,10 @@ final class PiRPCClient {
 
   func getMessages() async throws -> RPCResponse<AgentMessagesResponse> {
     try await send(command: ["type": "get_messages"])
+  }
+
+  func getEntries() async throws -> RPCResponse<AgentEntriesResponse> {
+    try await send(command: ["type": "get_entries"])
   }
 
   func getLastAssistantText() async throws -> RPCResponse<LastTextResponse> {
@@ -139,7 +162,7 @@ final class PiRPCClient {
   /// First tries Server-Sent Events on `baseURL/events`.  If the server does not
   /// support SSE, falls back to polling `get_last_assistant_text` and
   /// `get_messages` until the agent stops streaming.
-  func streamEvents(forPrompt promptText: String) -> AsyncStream<AgentEvent> {
+  func streamEvents(forPrompt promptText: String, onEntryId: (@MainActor (String?) -> Void)? = nil) -> AsyncStream<AgentEvent> {
     print("[PiRPCClient] streamEvents start for prompt: \(promptText.prefix(40))")
     let stream = AsyncStream<AgentEvent> { continuation in
       let task = Task { [weak self] in
@@ -161,7 +184,10 @@ final class PiRPCClient {
 
         do {
           print("[PiRPCClient] sending prompt RPC")
-          _ = try await self.prompt(message: promptText)
+          let response = try await self.prompt(message: promptText)
+          if let onEntryId {
+            await onEntryId(response.data?.entryId)
+          }
           print("[PiRPCClient] prompt RPC accepted")
         } catch {
           print("[PiRPCClient] prompt RPC failed: \(error.localizedDescription)")
@@ -193,7 +219,7 @@ final class PiRPCClient {
   /// Re-runs the last user turn and streams agent events back.
   ///
   /// Uses the same SSE/polling fallback as `streamEvents(forPrompt:)`.
-  func streamRerunEvents() -> AsyncStream<AgentEvent> {
+  func streamRerunEvents(message: String? = nil, entryId: String? = nil, onEntryId: (@MainActor (String?) -> Void)? = nil) -> AsyncStream<AgentEvent> {
     print("[PiRPCClient] streamRerunEvents start")
     let stream = AsyncStream<AgentEvent> { continuation in
       let task = Task { [weak self] in
@@ -215,7 +241,10 @@ final class PiRPCClient {
 
         do {
           print("[PiRPCClient] sending rerun request")
-          try await self.rerun()
+          let returnedEntryId = try await self.rerun(message: message, entryId: entryId)
+          if let onEntryId {
+            await onEntryId(returnedEntryId)
+          }
           print("[PiRPCClient] rerun request accepted")
         } catch {
           print("[PiRPCClient] rerun request failed: \(error.localizedDescription)")
@@ -369,6 +398,28 @@ final class PiRPCClient {
 
 struct AgentMessagesResponse: Decodable, Sendable {
   let messages: [AgentMessage]
+}
+
+struct AgentEntriesResponse: Decodable, Sendable {
+  let entries: [AgentEntry]
+}
+
+struct AgentEntry: Decodable, Sendable {
+  let type: String
+  let id: String?
+  let parentId: String?
+  let timestamp: String?
+  let message: AgentMessage?
+}
+
+struct RerunResponse: Decodable, Sendable {
+  let success: Bool
+  let message: String?
+  let entryId: String?
+}
+
+struct PromptResponse: Decodable, Sendable {
+  let entryId: String?
 }
 
 struct LastTextResponse: Decodable, Sendable {

@@ -88,17 +88,18 @@ final class ChatStore: Identifiable {
 
   func loadMessages() async {
     do {
-      let response = try await rpcClient.getMessages()
-      guard let agentMessages = response.data?.messages else { return }
+      let response = try await rpcClient.getEntries()
+      guard let entries = response.data?.entries else { return }
 
-      let chatMessages = agentMessages.compactMap { agentMessage -> ChatMessage? in
+      let chatMessages = entries.compactMap { entry -> ChatMessage? in
+        guard entry.type == "message", let agentMessage = entry.message else { return nil }
         guard let role = agentMessage.role else { return nil }
         let text = agentMessage.content?.textBlocks().joined(separator: "\n\n") ?? ""
 
         if role == "user" {
-          return ChatMessage(role: .user, text: text, tokens: 0)
+          return ChatMessage(entryId: entry.id, role: .user, text: text, tokens: 0)
         } else if role == "assistant" {
-          var message = ChatMessage(role: .assistant, text: text, tokens: 0)
+          var message = ChatMessage(entryId: entry.id, role: .assistant, text: text, tokens: 0)
           self.populate(message: &message, from: agentMessage)
           return message
         }
@@ -193,14 +194,23 @@ final class ChatStore: Identifiable {
     guard !trimmed.isEmpty else { return }
 
     if let id = editingMessageId {
-      if let index = messages.firstIndex(where: { $0.id == id }) {
-        updateMessage(at: index) { $0.text = trimmed }
-      }
+      guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
+
+      updateMessage(at: index) { $0.text = trimmed }
+
       withAnimation(.snappy) {
+        if messages.indices.contains(index + 1) {
+          messages.removeSubrange((index + 1)...)
+        }
         editingMessageId = nil
         draft = ""
         pastedItems = []
         contextFiles = []
+        isResponding = true
+      }
+
+      Task { @MainActor in
+        await streamRerun(message: trimmed, entryId: messages[index].entryId, userMessageIndex: index)
       }
       return
     }
@@ -258,13 +268,15 @@ final class ChatStore: Identifiable {
           assistantIndex > 0,
           messages[assistantIndex - 1].role == .user else { return }
 
+    let userMessage = messages[assistantIndex - 1]
+
     withAnimation(.snappy) {
       messages.removeSubrange(assistantIndex...)
       isResponding = true
     }
 
     Task { @MainActor in
-      await streamRerun()
+      await streamRerun(message: userMessage.text, entryId: userMessage.entryId, userMessageIndex: assistantIndex - 1)
     }
   }
 
@@ -294,10 +306,21 @@ final class ChatStore: Identifiable {
       print("[ChatStore] setThinkingLevel failed: \(error.localizedDescription)")
     }
 
-    await consumeStreamEvents(rpcClient.streamEvents(forPrompt: userText), at: messageIndex)
+    let userMessageIndex = messageIndex - 1
+    await consumeStreamEvents(
+      rpcClient.streamEvents(
+        forPrompt: userText,
+        onEntryId: { [weak self] entryId in
+          guard let self, let entryId = entryId else { return }
+          print("[ChatStore] prompt entryId captured: \(entryId)")
+          self.updateMessage(at: userMessageIndex) { $0.entryId = entryId }
+        }
+      ),
+      at: messageIndex
+    )
   }
 
-  private func streamRerun() async {
+  private func streamRerun(message: String? = nil, entryId: String? = nil, userMessageIndex: Int? = nil) async {
     let messageIndex = self.messages.count
     print("[ChatStore] streamRerun start index=\(messageIndex)")
 
@@ -313,7 +336,18 @@ final class ChatStore: Identifiable {
       print("[ChatStore] setThinkingLevel failed: \(error.localizedDescription)")
     }
 
-    await consumeStreamEvents(rpcClient.streamRerunEvents(), at: messageIndex)
+    await consumeStreamEvents(
+      rpcClient.streamRerunEvents(
+        message: message,
+        entryId: entryId,
+        onEntryId: { [weak self] returnedEntryId in
+          guard let self, let userMessageIndex = userMessageIndex, let returnedEntryId = returnedEntryId else { return }
+          print("[ChatStore] rerun entryId captured: \(returnedEntryId)")
+          self.updateMessage(at: userMessageIndex) { $0.entryId = returnedEntryId }
+        }
+      ),
+      at: messageIndex
+    )
   }
 
   private func consumeStreamEvents(_ events: AsyncStream<AgentEvent>, at messageIndex: Int) async {
@@ -399,7 +433,9 @@ final class ChatStore: Identifiable {
       case .messageEnd(let message):
         print("[ChatStore] messageEnd")
         updateThinkingSeconds()
-        finalize(message: message, at: messageIndex)
+        if message.role == "assistant" {
+          finalize(message: message, at: messageIndex)
+        }
 
       case .agentEnd(let messages):
         print("[ChatStore] agentEnd messages.count=\(messages.count)")
