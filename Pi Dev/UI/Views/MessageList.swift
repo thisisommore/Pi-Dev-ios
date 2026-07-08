@@ -36,6 +36,7 @@ struct MessageList: View {
         .frame(maxHeight: .infinity)
         .scrollDismissesKeyboard(.interactively)
         .scrollEdgeEffectStyle(.soft, for: .all)
+        .defaultScrollAnchor(.bottom)
         .onScrollGeometryChange(for: Bool.self, of: { geometry in
           let threshold: CGFloat = 80
           let visibleBottom = geometry.contentOffset.y + geometry.bounds.height
@@ -57,9 +58,6 @@ struct MessageList: View {
           withAnimation(.snappy) {
             proxy.scrollTo(store.messages.last?.id, anchor: .bottom)
           }
-        }
-        .onAppear {
-          proxy.scrollTo(store.messages.last?.id, anchor: .bottom)
         }
       }
     }
