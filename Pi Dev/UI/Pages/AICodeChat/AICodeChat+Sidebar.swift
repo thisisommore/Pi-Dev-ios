@@ -40,7 +40,7 @@ struct Sidebar: View {
         .padding(.bottom, 12)
 
         ScrollView {
-          LazyVStack(spacing: 8) {
+          LazyVStack(spacing: 0) {
             if store.filteredSessions.isEmpty {
               Text("No sessions")
                 .font(.subheadline)
@@ -52,7 +52,7 @@ struct Sidebar: View {
                   .font(.title3.weight(.bold))
                   .frame(maxWidth: .infinity, alignment: .leading)
                   .padding(.horizontal, 14)
-                  .padding(.top, 8)
+                  .padding(.vertical, 8)
 
                 ForEach(group.sessions) { session in
                   Button {
@@ -74,7 +74,7 @@ struct Sidebar: View {
                       }
                     }
                     .padding(.horizontal, 14)
-                    .padding(.vertical, 14)
+                    .padding(.vertical, 10)
                   }
                   .buttonStyle(.plain)
                   .background {
