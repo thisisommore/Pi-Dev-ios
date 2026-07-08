@@ -1367,12 +1367,12 @@ private struct Composer: View {
                                 .background(.secondary.opacity(0.08), in: .rect(cornerRadius: 12))
                             }
                         }
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, 20)
                     }
 
                     // Input + buttons container
                     VStack(spacing: 0) {
-                    if hasAttachments {
+                        if hasAttachments {
                         HStack {
                             Spacer()
                             Button("Clear all") {
