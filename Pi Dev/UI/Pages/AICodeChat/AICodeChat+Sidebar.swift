@@ -7,6 +7,8 @@ import SwiftUI
 
 struct Sidebar: View {
   @Bindable var store: SidebarStore
+  @AppStorage("piServerBaseURL") private var serverURL = ""
+  @AppStorage("piAuthToken") private var authToken = ""
 
   var body: some View {
     ZStack {
@@ -109,6 +111,29 @@ struct Sidebar: View {
         }
 
         Spacer(minLength: 0)
+
+        Divider()
+          .padding(.horizontal, 16)
+
+        Button {
+          store.logout()
+          serverURL = ""
+          authToken = ""
+        } label: {
+          HStack(spacing: 10) {
+            Image(systemName: "rectangle.portrait.and.arrow.forward")
+              .font(.system(size: 15, weight: .regular))
+              .frame(width: 24)
+            Text("Log Out")
+              .font(.subheadline.weight(.medium))
+            Spacer()
+          }
+          .foregroundStyle(.secondary)
+          .padding(.horizontal, 16)
+          .padding(.vertical, 14)
+        }
+        .buttonStyle(.plain)
+        .padding(.bottom, 8)
       }
     }
   }

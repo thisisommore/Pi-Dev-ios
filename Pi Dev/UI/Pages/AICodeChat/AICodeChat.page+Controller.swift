@@ -673,6 +673,13 @@ final class SidebarStore {
     }
   }
 
+  func logout() {
+    sessions.removeAll()
+    selectedSessionId = nil
+    searchText = ""
+    activeChat = ChatStore()
+  }
+
   private func syncActiveSession() async {
     guard let session = sessions.first(where: { $0.id == selectedSessionId }) else { return }
     await activeChat.resetToSession(title: sessionTitle(session))
