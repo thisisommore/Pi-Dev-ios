@@ -13,6 +13,10 @@ struct Header: View {
   @State private var showRenameAlert = false
   @State private var renameDraft = ""
 
+  private func dismissKeyboard() {
+    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+  }
+
   var body: some View {
     GlassEffectContainer(spacing: 12) {
       HStack(spacing: 12) {
@@ -20,6 +24,7 @@ struct Header: View {
           withAnimation(.snappy) {
             showSidebar.toggle()
           }
+          dismissKeyboard()
         } label: {
           Image(systemName: "line.3.horizontal")
             .font(.system(size: 17, weight: .semibold))
