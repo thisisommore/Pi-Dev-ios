@@ -62,7 +62,7 @@ struct SetupView: View {
             text: $urlDraft,
             field: .url
           ) {
-            TextField("Server URL", text: $urlDraft, prompt: Text("http://localhost:3000"))
+            TextField("Server URL", text: $urlDraft)
               .textInputAutocapitalization(.never)
               .autocorrectionDisabled()
               .keyboardType(.URL)
