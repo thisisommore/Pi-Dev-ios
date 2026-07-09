@@ -187,7 +187,7 @@ final class ChatStore: Identifiable {
 
     let toolCalls = agentMessage.content?.toolCalls() ?? []
     message.tools = toolCalls.map { call in
-      let detail = call.arguments?.map { "\($0.key): \($0.value.value)" }.joined(separator: "\n") ?? ""
+      let detail = formatToolDetail(name: call.name, arguments: call.arguments)
       return ToolUse(kind: toolKind(for: call.name), name: call.name, detail: detail, symbol: toolSymbol(for: call.name))
     }
 
@@ -461,7 +461,7 @@ final class ChatStore: Identifiable {
         case .thinkingEnd:
           updateThinkingSeconds()
         case .toolCallEnd(_, let call):
-          let detail = call.arguments?.map { "\($0.key): \($0.value.value)" }.joined(separator: "\n") ?? ""
+          let detail = formatToolDetail(name: call.name, arguments: call.arguments)
           updateMessage(at: messageIndex) {
             $0.tools.append(
               ToolUse(
@@ -599,6 +599,53 @@ final class ChatStore: Identifiable {
     case let n where n.contains("bash") || n.contains("run"): return "terminal"
     case let n where n.contains("test"): return "checkmark.seal"
     default: return "gearshape.2"
+    }
+  }
+
+  /// Prefer the primary value for single-arg tools (bash command, file path).
+  /// Fall back to stable "key: value" lines for multi-arg calls.
+  private func formatToolDetail(name: String, arguments: [String: AnyCodable]?) -> String {
+    guard let arguments, !arguments.isEmpty else { return "" }
+
+    let preferredKeys = preferredDetailKeys(for: name)
+    for key in preferredKeys {
+      if let raw = arguments[key]?.value {
+        let text = stringValue(raw)
+        if !text.isEmpty { return text }
+      }
+    }
+
+    // Single argument — show value only
+    if arguments.count == 1, let only = arguments.values.first {
+      return stringValue(only.value)
+    }
+
+    return arguments
+      .sorted { $0.key < $1.key }
+      .map { "\($0.key): \(stringValue($0.value.value))" }
+      .joined(separator: "\n")
+  }
+
+  private func preferredDetailKeys(for name: String) -> [String] {
+    switch name.lowercased() {
+    case let n where n.contains("bash") || n.contains("shell") || n.contains("run"):
+      return ["command", "cmd", "script"]
+    case let n where n.contains("read") || n.contains("write") || n.contains("edit"):
+      return ["path", "file", "file_path", "filename"]
+    case let n where n.contains("search") || n.contains("grep") || n.contains("find"):
+      return ["query", "pattern", "path"]
+    default:
+      return ["command", "path", "file", "query"]
+    }
+  }
+
+  private func stringValue(_ value: Any) -> String {
+    switch value {
+    case let s as String: return s
+    case let n as NSNumber: return n.stringValue
+    case let b as Bool: return b ? "true" : "false"
+    case is NSNull: return ""
+    default: return "\(value)"
     }
   }
 }

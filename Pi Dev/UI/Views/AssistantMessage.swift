@@ -10,7 +10,7 @@ struct AssistantMessage: View {
   @Bindable var store: ChatStore
 
   private var hasContent: Bool {
-    !message.text.isEmpty || message.thinking != nil || !message.tools.isEmpty || !message.terminal.isEmpty
+    !message.text.isEmpty || message.thinking != nil || !message.tools.isEmpty
   }
 
   private var attributedText: AttributedString {
@@ -31,9 +31,7 @@ struct AssistantMessage: View {
       }
       if !message.tools.isEmpty {
         ToolRow(tools: message.tools)
-      }
-      ForEach(message.terminal) { run in
-        TerminalBlock(run: run)
+          .padding(.top, message.thinking != nil ? 2 : 0)
       }
 
       Text(attributedText)
