@@ -14,6 +14,7 @@ final class ChatStore: Identifiable {
   var selectedModel: AgentModel? = nil
   var availableModels: [AgentModel] = []
   var thinkingLevel: ThinkingLevel = .high
+  var supportedThinkingLevels: [ThinkingLevel] = ThinkingLevel.defaultLevels
   var usedTokens: Int = 0
   var draft: String = ""
   var isResponding = false
@@ -64,6 +65,7 @@ final class ChatStore: Identifiable {
       await MainActor.run {
         withAnimation(.snappy) { self.selectedModel = model }
       }
+      await syncStateFromServer()
     } catch {
       await MainActor.run {
         withAnimation(.snappy) { self.selectedModel = model }
@@ -84,6 +86,48 @@ final class ChatStore: Identifiable {
         contextFiles = []
         messageQueue = []
       }
+    }
+  }
+
+  private func buildSupportedThinkingLevels(from map: [String: String?]?) -> [ThinkingLevel] {
+    var levels = ThinkingLevel.defaultLevels.filter { level in
+      guard let map, let entry = map[level.id] else { return true }
+      return entry != nil
+    }
+
+    if let map {
+      let extras = map.compactMap { key, value -> ThinkingLevel? in
+        guard value != nil, !ThinkingLevel.defaultLevels.contains(where: { $0.id == key }) else { return nil }
+        return ThinkingLevel(id: key)
+      }
+      levels.append(contentsOf: extras.sorted { $0.id < $1.id })
+    }
+
+    return levels
+  }
+
+  private func apply(state: AgentState) {
+    if let model = state.model {
+      self.selectedModel = model
+    }
+    if let levelString = state.thinkingLevel {
+      self.thinkingLevel = ThinkingLevel(id: levelString)
+    }
+    self.supportedThinkingLevels = self.buildSupportedThinkingLevels(from: state.model?.thinkingLevelMap)
+  }
+
+  private func syncStateFromServer() async {
+    do {
+      let state = try await rpcClient.getState()
+      await MainActor.run {
+        withAnimation(.snappy) {
+          if let stateData = state.data {
+            self.apply(state: stateData)
+          }
+        }
+      }
+    } catch {
+      // Keep existing levels if the server is unreachable.
     }
   }
 
@@ -112,12 +156,8 @@ final class ChatStore: Identifiable {
         withAnimation(.snappy) {
           self.messages = chatMessages
           self.usedTokens = chatMessages.reduce(0) { $0 + $1.tokens }
-          if let model = state.data?.model {
-            self.selectedModel = model
-          }
-          if let levelString = state.data?.thinkingLevel,
-             let level = ThinkingLevel(rawValue: levelString.capitalized) {
-            self.thinkingLevel = level
+          if let stateData = state.data {
+            self.apply(state: stateData)
           }
         }
       }

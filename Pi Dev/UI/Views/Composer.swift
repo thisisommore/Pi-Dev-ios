@@ -118,9 +118,9 @@ struct Composer: View {
 
               Menu {
                 Picker("Thinking", selection: $store.thinkingLevel) {
-                  ForEach(ThinkingLevel.allCases) { level in
+                  ForEach(store.supportedThinkingLevels) { level in
                     Label {
-                      Text(level.rawValue)
+                      Text(level.displayName)
                       Text(level.budget)
                     } icon: {
                       Image(systemName: level.symbol)
@@ -129,7 +129,7 @@ struct Composer: View {
                   }
                 }
               } label: {
-                PillLabel(symbol: nil, text: store.thinkingLevel.rawValue)
+                PillLabel(symbol: nil, text: store.thinkingLevel.displayName)
               }
               .buttonStyle(.plain)
               .glassEffect(.regular.interactive(), in: .capsule)

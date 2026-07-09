@@ -257,6 +257,7 @@ struct AgentModel: Decodable, Sendable {
   let name: String
   let provider: String?
   let contextWindow: Int?
+  let thinkingLevelMap: [String: String?]?
 }
 
 struct AnyCodable: Decodable, @unchecked Sendable {

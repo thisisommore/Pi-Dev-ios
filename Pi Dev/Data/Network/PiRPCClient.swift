@@ -119,7 +119,7 @@ final class PiRPCClient {
   }
 
   func setThinkingLevel(_ level: ThinkingLevel) async throws -> RPCResponse<EmptyResponse> {
-    try await send(command: ["type": "set_thinking_level", "level": level.rawValue.lowercased()])
+    try await send(command: ["type": "set_thinking_level", "level": level.id])
   }
 
   func setModel(provider: String, modelId: String) async throws -> RPCResponse<AgentModel> {
