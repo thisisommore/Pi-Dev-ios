@@ -25,7 +25,7 @@ struct SetupView: View {
     if trimmed.lowercased().hasPrefix("http://") || trimmed.lowercased().hasPrefix("https://") {
       return trimmed
     }
-    return "http://\(trimmed)"
+    return "https://\(trimmed)"
   }
 
   private var canContinue: Bool {
