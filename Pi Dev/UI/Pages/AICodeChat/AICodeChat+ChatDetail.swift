@@ -11,6 +11,10 @@ struct ChatDetailView: View {
   @Binding var showSidebar: Bool
   var onNewChat: () -> Void = {}
 
+  private func dismissKeyboard() {
+    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+  }
+
   var body: some View {
     ZStack {
       Background()
@@ -27,6 +31,7 @@ struct ChatDetailView: View {
       .contentShape(.rect)
       .onTapGesture {
         store.cancelEditIfUnchanged()
+        dismissKeyboard()
       }
     }
     .safeAreaInset(edge: .bottom) {
