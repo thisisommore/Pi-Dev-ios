@@ -30,6 +30,7 @@ final class ChatStore: Identifiable {
   }
 
   var isStreaming: Bool { messages.contains { $0.isStreaming } }
+  var generatingMessageId: UUID? = nil
 
   var queuedMessagesForDisplay: [QueuedMessage] {
     messageQueue.enumerated().reversed().map { QueuedMessage(id: $0.offset, text: $0.element) }
@@ -299,6 +300,7 @@ final class ChatStore: Identifiable {
       self.isResponding = false
     }
     print("[ChatStore] appended streaming assistant message at index=\(messageIndex)")
+    self.generatingMessageId = self.messages[messageIndex].id
 
     do {
       try await rpcClient.setThinkingLevel(thinkingLevel)
@@ -329,6 +331,7 @@ final class ChatStore: Identifiable {
       self.isResponding = false
     }
     print("[ChatStore] appended streaming assistant message at index=\(messageIndex)")
+    self.generatingMessageId = self.messages[messageIndex].id
 
     do {
       try await rpcClient.setThinkingLevel(thinkingLevel)
@@ -467,6 +470,7 @@ final class ChatStore: Identifiable {
     }
 
     print("[ChatStore] event loop ended")
+    self.generatingMessageId = nil
     guard self.messages.indices.contains(messageIndex) else {
       print("[ChatStore] final check: index \(messageIndex) out of range")
       return

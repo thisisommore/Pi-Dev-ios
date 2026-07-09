@@ -38,7 +38,7 @@ struct AssistantMessage: View {
         CodeBlock(language: code.language, source: code.source)
       }
 
-      if !message.isStreaming {
+      if !message.isStreaming && message.id == store.messages.last?.id && store.generatingMessageId == nil {
         HStack(spacing: 10) {
           Text("\(message.tokens.formatted(.number.notation(.compactName))) tok")
           CopyButton(message: message)
