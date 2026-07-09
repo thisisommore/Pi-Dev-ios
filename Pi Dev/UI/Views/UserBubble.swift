@@ -11,7 +11,8 @@ struct UserBubble: View {
   @Bindable var store: ChatStore
 
   private var attributedText: AttributedString {
-    (try? AttributedString(markdown: message.text)) ?? AttributedString(message.text)
+    let preserved = message.text.replacingOccurrences(of: "\n", with: "  \n")
+    return (try? AttributedString(markdown: preserved)) ?? AttributedString(message.text)
   }
 
   var body: some View {
