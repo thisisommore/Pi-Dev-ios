@@ -17,7 +17,7 @@ struct ThinkingBlock: View {
         .font(.caption)
         .foregroundStyle(.secondary)
         .lineLimit(2)
-        .padding(.vertical, 8)
+        .padding(.vertical, 2)
         .contentShape(.rect)
     }
     .buttonStyle(.plain)
