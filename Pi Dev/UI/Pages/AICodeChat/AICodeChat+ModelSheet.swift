@@ -7,6 +7,16 @@ import SwiftUI
 
 struct ModelSheet: View {
   @Bindable var store: ChatStore
+  @State private var searchText = ""
+
+  private var filteredModels: [AgentModel] {
+    let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    guard !query.isEmpty else { return store.availableModels }
+    return store.availableModels.filter {
+      $0.name.lowercased().contains(query)
+        || ($0.provider?.lowercased().contains(query) ?? false)
+    }
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
@@ -16,7 +26,34 @@ struct ModelSheet: View {
         .frame(maxWidth: .infinity)
         .padding(.top, 10)
 
-      ModelList(store: store, models: store.availableModels)
+      HStack(spacing: 10) {
+        Image(systemName: "magnifyingglass")
+          .font(.system(size: 14, weight: .medium))
+          .foregroundStyle(.secondary)
+
+        TextField("Search models", text: $searchText)
+          .font(.callout)
+          .textInputAutocapitalization(.never)
+          .autocorrectionDisabled()
+
+        if !searchText.isEmpty {
+          Button {
+            searchText = ""
+          } label: {
+            Image(systemName: "xmark.circle.fill")
+              .font(.system(size: 18))
+              .foregroundStyle(.secondary)
+          }
+          .buttonStyle(.plain)
+        }
+      }
+      .padding(.horizontal, 12)
+      .padding(.vertical, 10)
+      .background(.secondary.opacity(0.12), in: .rect(cornerRadius: 12))
+      .padding(.horizontal, 16)
+      .padding(.top, 4)
+
+      ModelList(store: store, models: filteredModels)
 
       Spacer(minLength: 0)
     }
