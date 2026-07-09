@@ -14,8 +14,10 @@ struct AssistantMessage: View {
   }
 
   private var attributedText: AttributedString {
-    let preserved = message.text.replacingOccurrences(of: "\n", with: "  \n")
-    return (try? AttributedString(markdown: preserved)) ?? AttributedString(message.text)
+    (try? AttributedString(
+      markdown: message.text,
+      options: AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+    )) ?? AttributedString(message.text)
   }
 
   var body: some View {
