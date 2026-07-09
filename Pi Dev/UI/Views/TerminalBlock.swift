@@ -14,7 +14,7 @@ struct TerminalBlock: View {
       Button {
         withAnimation(.snappy) { expanded.toggle() }
       } label: {
-        HStack(spacing: 8) {
+        HStack(spacing: 0) {
           Text(run.command)
             .font(.system(size: 11, weight: .medium, design: .monospaced))
             .lineLimit(1)

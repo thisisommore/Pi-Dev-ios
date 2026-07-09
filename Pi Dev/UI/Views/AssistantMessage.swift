@@ -14,7 +14,7 @@ struct AssistantMessage: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 10) {
+    VStack(alignment: .leading, spacing: 2) {
       if message.isStreaming && !hasContent {
         LoadingDots()
       }
@@ -50,7 +50,7 @@ struct AssistantMessage: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(.horizontal, 16)
+    .padding(.horizontal, 2)
   }
 }
 

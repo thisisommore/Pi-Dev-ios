@@ -15,7 +15,7 @@ struct MessageList: View {
     } else {
       ScrollViewReader { proxy in
         ScrollView {
-          LazyVStack(spacing: 18) {
+          LazyVStack(spacing: 12) {
             ForEach(store.messages) { message in
               MessageRow(message: message, store: store)
                 .id(message.id)
