@@ -17,171 +17,9 @@ struct Composer: View {
   @Environment(\.colorScheme) private var colorScheme
 
   private var hasAttachments: Bool { !store.pastedItems.isEmpty || !store.contextFiles.isEmpty }
-
   var body: some View {
     GlassEffectContainer(spacing: 10) {
-      VStack(spacing: 10) {
-        VStack(spacing: 0) {
-          if !store.messageQueue.isEmpty {
-            VStack(alignment: .leading, spacing: 0) {
-              ForEach(Array(store.queuedMessagesForDisplay.enumerated()), id: \.element.id) { index, queued in
-                QueuedMessageRow(queued: queued, isFirst: index == 0) {
-                  store.removeQueuedMessage(at: queued.id)
-                }
-              }
-            }
-            .padding(.horizontal, 34)
-          }
-
-          VStack(spacing: 0) {
-            if hasAttachments {
-              HStack {
-                Spacer()
-                Button("Clear all") {
-                  showClearAlert = true
-                }
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-              }
-              .padding(.horizontal, 16)
-              .padding(.top, 8)
-
-              ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                  ForEach(store.pastedItems) { item in
-                    attachmentCard(
-                      icon: "doc.on.clipboard",
-                      title: "Pasted",
-                      preview: item.content,
-                      onTap: { selectedPastedItem = item },
-                      onRemove: {
-                        withAnimation(.snappy) {
-                          store.pastedItems.removeAll { $0.id == item.id }
-                        }
-                      }
-                    )
-                  }
-                  ForEach(store.contextFiles) { file in
-                    attachmentCard(
-                      icon: "doc.text",
-                      title: file.name,
-                      preview: file.content,
-                      onTap: { selectedContextFile = file },
-                      onRemove: {
-                        withAnimation(.snappy) {
-                          store.contextFiles.removeAll { $0.id == file.id }
-                        }
-                      }
-                    )
-                  }
-                }
-                .padding(.horizontal, 14)
-                .padding(.top, 6)
-              }
-              .scrollClipDisabled()
-            }
-
-            TextField(
-              store.editingMessageId != nil ? "Edit message…" : "Ask about your code…",
-              text: $store.draft,
-              axis: .vertical
-            )
-            .lineLimit(1...5)
-            .focused($focused)
-            .font(.callout)
-            .onSubmit {
-              focused = false
-              store.send()
-            }
-            .onChange(of: store.editingMessageId) { _, id in
-              if id != nil { focused = true }
-            }
-            .onChange(of: store.draft) { oldValue, newValue in
-              guard store.editingMessageId == nil else { return }
-              let delta = newValue.count - oldValue.count
-              if delta > 3 && newValue.count > 50 {
-                store.pastedItems.append(PastedItem(content: newValue))
-                store.draft = ""
-              }
-            }
-            .padding(.top, hasAttachments ? 8 : 14)
-            .padding(.horizontal, 14)
-
-            HStack(spacing: 8) {
-              Button {
-                showModelSheet = true
-              } label: {
-                PillLabel(symbol: nil, text: store.selectedModel?.name ?? "Model")
-              }
-              .buttonStyle(.plain)
-              .glassEffect(.regular.interactive(), in: .capsule)
-
-              Menu {
-                Picker("Thinking", selection: $store.thinkingLevel) {
-                  ForEach(store.supportedThinkingLevels) { level in
-                    Label {
-                      Text(level.displayName)
-                      Text(level.budget)
-                    } icon: {
-                      Image(systemName: level.symbol)
-                    }
-                    .tag(level)
-                  }
-                }
-              } label: {
-                PillLabel(symbol: nil, text: store.thinkingLevel.displayName)
-              }
-              .buttonStyle(.plain)
-              .glassEffect(.regular.interactive(), in: .capsule)
-
-              Spacer()
-
-              Button {
-                showFileImporter = true
-              } label: {
-                Image(systemName: "plus")
-                  .font(.system(size: 16, weight: .semibold))
-                  .frame(width: 40, height: 40)
-              }
-              .buttonStyle(.plain)
-
-              Button {
-                focused = false
-                store.send()
-              } label: {
-                Image(systemName: "arrow.up")
-                  .font(.system(size: 15, weight: .bold))
-                  .frame(width: 40, height: 40)
-                  .foregroundStyle(.white)
-                  .background(
-                    store.draft.isEmpty
-                      ? AnyShapeStyle(.gray.opacity(0.4))
-                      : AnyShapeStyle(appColor.gradient),
-                    in: .circle
-                  )
-              }
-              .buttonStyle(.plain)
-              .disabled(store.draft.isEmpty && store.pastedItems.isEmpty && store.contextFiles.isEmpty)
-              .animation(.snappy, value: store.draft.isEmpty && store.pastedItems.isEmpty && store.contextFiles.isEmpty)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 6)
-            .padding(.horizontal, 10)
-          }
-          .background(
-            colorScheme == .dark
-              ? AnyShapeStyle(.ultraThickMaterial)
-              : AnyShapeStyle(.white),
-            in: .rect(cornerRadius: 26)
-          )
-          .overlay(
-            RoundedRectangle(cornerRadius: 26)
-              .stroke(.secondary.opacity(0.25), lineWidth: 0.5)
-          )
-          .padding(.horizontal, 16)
-          .padding(.bottom, 8)
-        }
-      }
+      mainContent
     }
     .fileImporter(
       isPresented: $showFileImporter,
@@ -213,6 +51,178 @@ struct Composer: View {
     } message: {
       Text("This will remove all attachments")
     }
+  }
+
+  private var mainContent: some View {
+    VStack(spacing: 10) {
+      VStack(spacing: 0) {
+        if !store.messageQueue.isEmpty {
+          VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(store.queuedMessagesForDisplay.enumerated()), id: \.element.id) { index, queued in
+              QueuedMessageRow(queued: queued, isFirst: index == 0) {
+                store.removeQueuedMessage(at: queued.id)
+              }
+            }
+          }
+          .padding(.horizontal, 34)
+        }
+
+        inputCard
+      }
+    }
+  }
+
+  private var inputCard: some View {
+    VStack(spacing: 0) {
+      if hasAttachments {
+        HStack {
+          Spacer()
+          Button("Clear all") {
+            showClearAlert = true
+          }
+          .font(.caption.weight(.semibold))
+          .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+
+        ScrollView(.horizontal, showsIndicators: false) {
+          HStack(spacing: 8) {
+            ForEach(store.pastedItems) { item in
+              attachmentCard(
+                icon: "doc.on.clipboard",
+                title: "Pasted",
+                preview: item.content,
+                onTap: { selectedPastedItem = item },
+                onRemove: {
+                  withAnimation(.snappy) {
+                    store.pastedItems.removeAll { $0.id == item.id }
+                  }
+                }
+              )
+            }
+            ForEach(store.contextFiles) { file in
+              attachmentCard(
+                icon: "doc.text",
+                title: file.name,
+                preview: file.content,
+                onTap: { selectedContextFile = file },
+                onRemove: {
+                  withAnimation(.snappy) {
+                    store.contextFiles.removeAll { $0.id == file.id }
+                  }
+                }
+              )
+            }
+          }
+          .padding(.horizontal, 14)
+          .padding(.top, 6)
+        }
+        .scrollClipDisabled()
+      }
+
+      TextField(
+        store.editingMessageId != nil ? "Edit message…" : "Ask about your code…",
+        text: $store.draft,
+        prompt: Text(store.editingMessageId != nil ? "Edit message…" : "Ask about your code…").foregroundColor(.gray.opacity(0.7)),
+        axis: .vertical
+      )
+      .lineLimit(1...5)
+      .focused($focused)
+      .font(.callout)
+      .onSubmit {
+        focused = false
+        store.send()
+      }
+      .onChange(of: store.editingMessageId) { _, id in
+        if id != nil { focused = true }
+      }
+      .onChange(of: store.draft) { oldValue, newValue in
+        guard store.editingMessageId == nil else { return }
+        let delta = newValue.count - oldValue.count
+        if delta > 3 && newValue.count > 50 {
+          store.pastedItems.append(PastedItem(content: newValue))
+          store.draft = ""
+        }
+      }
+      .padding(.top, hasAttachments ? 8 : 14)
+      .padding(.horizontal, 14)
+
+      toolbar
+    }
+    .background(
+      colorScheme == .dark
+        ? AnyShapeStyle(.ultraThickMaterial)
+        : AnyShapeStyle(.white),
+      in: .rect(cornerRadius: 26)
+    )
+    .overlay(
+      RoundedRectangle(cornerRadius: 26)
+        .stroke(.secondary.opacity(colorScheme == .dark ? 0.25 : 0.15), lineWidth: 0.5)
+    )
+    .compositingGroup()
+    .padding(.horizontal, 16)
+    .padding(.bottom, 8)
+  }
+
+  private var toolbar: some View {
+    HStack(spacing: 8) {
+      Button {
+        showModelSheet = true
+      } label: {
+        PillLabel(symbol: nil, text: store.selectedModel?.name ?? "Model")
+      }
+      .buttonStyle(.plain)
+      .glassEffect(.regular.interactive(), in: .capsule)
+
+      Menu {
+        Picker("Thinking", selection: $store.thinkingLevel) {
+          ForEach(store.supportedThinkingLevels) { level in
+            Label {
+              Text(level.displayName)
+              Text(level.budget)
+            } icon: {
+              Image(systemName: level.symbol)
+            }
+            .tag(level)
+          }
+        }
+      } label: {
+        PillLabel(symbol: nil, text: store.thinkingLevel.displayName)
+      }
+      .buttonStyle(.plain)
+      .glassEffect(.regular.interactive(), in: .capsule)
+
+      Spacer()
+
+      Button {
+        showFileImporter = true
+      } label: {
+        Image(systemName: "plus")
+          .font(.system(size: 16, weight: .semibold))
+          .frame(width: 40, height: 40)
+      }
+      .buttonStyle(.plain)
+
+      Button {
+        focused = false
+        store.send()
+      } label: {
+        Image(systemName: "arrow.up")
+          .font(.system(size: 15, weight: .bold))
+          .frame(width: 40, height: 40)
+          .foregroundStyle(.white)
+          .background(AnyShapeStyle(appColor.gradient),
+            in: .circle
+          )
+      }
+      .buttonStyle(.plain)
+      .disabled(store.draft.isEmpty && store.pastedItems.isEmpty && store.contextFiles.isEmpty)
+      .animation(.snappy, value: store.draft.isEmpty && store.pastedItems.isEmpty && store.contextFiles.isEmpty)
+    }
+    .frame(maxWidth: .infinity)
+    .padding(.vertical, 6)
+    .padding(.horizontal, 10)
   }
 
   private func attachmentCard(
