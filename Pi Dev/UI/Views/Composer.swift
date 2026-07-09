@@ -89,7 +89,10 @@ struct Composer: View {
             .lineLimit(1...5)
             .focused($focused)
             .font(.callout)
-            .onSubmit { store.send() }
+            .onSubmit {
+              focused = false
+              store.send()
+            }
             .onChange(of: store.editingMessageId) { _, id in
               if id != nil { focused = true }
             }
@@ -143,6 +146,7 @@ struct Composer: View {
               .buttonStyle(.plain)
 
               Button {
+                focused = false
                 store.send()
               } label: {
                 Image(systemName: "arrow.up")
