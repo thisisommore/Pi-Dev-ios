@@ -22,6 +22,7 @@ final class ChatStore: Identifiable {
   var editingMessageId: UUID? = nil
   var pastedItems: [PastedItem] = []
   var contextFiles: [ContextFile] = []
+  var includedRepo: IncludedRepo? = nil
   var messageQueue: [String] = []
 
   private let rpcClient = PiRPCClient()
@@ -73,6 +74,14 @@ final class ChatStore: Identifiable {
     }
   }
 
+  func selectRepo(_ repo: IncludedRepo) {
+    withAnimation(.snappy) { self.includedRepo = repo }
+  }
+
+  func clearRepo() {
+    withAnimation(.snappy) { self.includedRepo = nil }
+  }
+
   func resetToSession(title: String) async {
     await MainActor.run {
       withAnimation(.snappy) {
@@ -84,6 +93,7 @@ final class ChatStore: Identifiable {
         editingMessageId = nil
         pastedItems = []
         contextFiles = []
+        includedRepo = nil
         messageQueue = []
       }
     }
@@ -196,6 +206,7 @@ final class ChatStore: Identifiable {
       editingMessageId = nil
       pastedItems = []
       contextFiles = []
+      includedRepo = nil
       messageQueue = []
     }
   }
@@ -208,6 +219,7 @@ final class ChatStore: Identifiable {
       editingMessageId = nil
       pastedItems = []
       contextFiles = []
+      includedRepo = nil
       messageQueue = []
     }
   }
@@ -256,6 +268,7 @@ final class ChatStore: Identifiable {
       return
     }
 
+    let repo = includedRepo
     draft = ""
     pastedItems = []
     contextFiles = []
@@ -267,7 +280,7 @@ final class ChatStore: Identifiable {
       return
     }
 
-    sendNow(trimmed)
+    sendNow(trimmed, repo: repo)
   }
 
   private func composeBody() -> String {
@@ -277,7 +290,7 @@ final class ChatStore: Identifiable {
     return [draft, attachmentsBody].filter { !$0.isEmpty }.joined(separator: "\n\n")
   }
 
-  private func sendNow(_ text: String) {
+  private func sendNow(_ text: String, repo: IncludedRepo? = nil) {
     if messages.isEmpty { chatTitle = String(text.prefix(34)) }
 
     withAnimation(.snappy) {
@@ -287,14 +300,14 @@ final class ChatStore: Identifiable {
     }
 
     Task { @MainActor in
-      await streamReply(for: text)
+      await streamReply(for: text, repo: repo)
     }
   }
 
   private func processQueue() {
     guard !messageQueue.isEmpty, !isResponding, !isStreaming else { return }
     let next = messageQueue.removeFirst()
-    sendNow(next)
+    sendNow(next, repo: includedRepo)
   }
 
   func removeQueuedMessage(at index: Int) {
@@ -331,7 +344,7 @@ final class ChatStore: Identifiable {
   }
 
 
-  private func streamReply(for userText: String) async {
+  private func streamReply(for userText: String, repo: IncludedRepo? = nil) async {
     let messageIndex = self.messages.count
     print("[ChatStore] streamReply start index=\(messageIndex)")
 
@@ -352,6 +365,7 @@ final class ChatStore: Identifiable {
     await consumeStreamEvents(
       rpcClient.streamEvents(
         forPrompt: userText,
+        repo: repo?.url,
         onEntryId: { [weak self] entryId in
           guard let self, let entryId = entryId else { return }
           print("[ChatStore] prompt entryId captured: \(entryId)")

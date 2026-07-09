@@ -14,6 +14,7 @@ struct Composer: View {
   @State private var selectedContextFile: ContextFile?
   @State private var showFileImporter = false
   @State private var showClearAlert = false
+  @State private var showRepoSheet = false
   @Environment(\.colorScheme) private var colorScheme
 
   private var hasAttachments: Bool { !store.pastedItems.isEmpty || !store.contextFiles.isEmpty }
@@ -37,6 +38,12 @@ struct Composer: View {
     .sheet(item: $selectedContextFile) { file in
       AttachmentSheet(title: file.name, content: file.content, monospaced: true)
         .presentationDetents([.medium])
+        .presentationBackground(.thinMaterial)
+        .presentationCornerRadius(32)
+    }
+    .sheet(isPresented: $showRepoSheet) {
+      RepoPickerSheet(store: store)
+        .presentationDetents([.large])
         .presentationBackground(.thinMaterial)
         .presentationCornerRadius(32)
     }
@@ -195,14 +202,27 @@ struct Composer: View {
 
       Spacer()
 
-      Button {
-        showFileImporter = true
+      Menu {
+        Button {
+          showFileImporter = true
+        } label: {
+          Label("Attachment", systemImage: "paperclip")
+        }
+
+        Button {
+          showRepoSheet = true
+        } label: {
+          Label("Repository", systemImage: "arrow.triangle.branch")
+        }
       } label: {
         Image(systemName: "plus")
           .font(.system(size: 16, weight: .semibold))
+          .foregroundStyle(.primary)
           .frame(width: 40, height: 40)
       }
       .buttonStyle(.plain)
+      .menuStyle(.borderlessButton)
+      .tint(.primary)
 
       Button {
         focused = false
@@ -285,4 +305,5 @@ struct Composer: View {
       break
     }
   }
+
 }

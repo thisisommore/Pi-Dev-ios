@@ -58,8 +58,10 @@ final class PiRPCClient {
 
   // MARK: - Typed commands
 
-  func prompt(message: String) async throws -> RPCResponse<PromptResponse> {
-    try await send(command: ["type": "prompt", "message": message])
+  func prompt(message: String, repo: String? = nil) async throws -> RPCResponse<PromptResponse> {
+    var command: [String: Any] = ["type": "prompt", "message": message]
+    if let repo { command["repo"] = repo }
+    return try await send(command: command)
   }
 
   func rerun(message: String? = nil, entryId: String? = nil) async throws -> String? {
@@ -200,7 +202,7 @@ final class PiRPCClient {
   /// First tries Server-Sent Events on `baseURL/events`.  If the server does not
   /// support SSE, falls back to polling `get_last_assistant_text` and
   /// `get_messages` until the agent stops streaming.
-  func streamEvents(forPrompt promptText: String, onEntryId: (@MainActor (String?) -> Void)? = nil) -> AsyncStream<AgentEvent> {
+  func streamEvents(forPrompt promptText: String, repo: String? = nil, onEntryId: (@MainActor (String?) -> Void)? = nil) -> AsyncStream<AgentEvent> {
     print("[PiRPCClient] streamEvents start for prompt: \(promptText.prefix(40))")
     let stream = AsyncStream<AgentEvent> { continuation in
       let task = Task { [weak self] in
@@ -222,7 +224,7 @@ final class PiRPCClient {
 
         do {
           print("[PiRPCClient] sending prompt RPC")
-          let response = try await self.prompt(message: promptText)
+          let response = try await self.prompt(message: promptText, repo: repo)
           if let onEntryId {
             await onEntryId(response.data?.entryId)
           }
