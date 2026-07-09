@@ -10,10 +10,14 @@ struct UserBubble: View {
   let message: ChatMessage
   @Bindable var store: ChatStore
 
+  private var attributedText: AttributedString {
+    (try? AttributedString(markdown: message.text)) ?? AttributedString(message.text)
+  }
+
   var body: some View {
     HStack {
       Spacer(minLength: 56)
-      Text(message.text)
+      Text(attributedText)
         .font(.callout)
         .padding(.horizontal, 16)
         .padding(.vertical, 11)

@@ -13,6 +13,10 @@ struct AssistantMessage: View {
     !message.text.isEmpty || message.thinking != nil || !message.tools.isEmpty || !message.terminal.isEmpty
   }
 
+  private var attributedText: AttributedString {
+    (try? AttributedString(markdown: message.text)) ?? AttributedString(message.text)
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: 2) {
       if message.isStreaming && !hasContent {
@@ -29,7 +33,7 @@ struct AssistantMessage: View {
         TerminalBlock(run: run)
       }
 
-      Text(message.text)
+      Text(attributedText)
         .font(.callout)
         .lineSpacing(3)
         .textSelection(.enabled)
