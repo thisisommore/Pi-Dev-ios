@@ -45,7 +45,7 @@ struct AssistantMessage: View {
 
       if !message.isStreaming && message.id == store.messages.last?.id && store.generatingMessageId == nil {
         HStack(spacing: 10) {
-          Text("\(message.tokens.formatted(.number.notation(.compactName))) tok")
+          Text("\(message.tokens.compactUS) tok")
           CopyButton(message: message)
           RetryButton(message: message, store: store)
         }

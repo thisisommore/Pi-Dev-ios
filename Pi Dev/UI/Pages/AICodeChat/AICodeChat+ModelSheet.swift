@@ -108,7 +108,7 @@ struct ModelRow: View {
           Text(model.name)
             .font(.subheadline.weight(.semibold))
           if let contextWindow = model.contextWindow {
-            Text("\(contextWindow.formatted(.number.notation(.compactName))) context")
+            Text("\(contextWindow.compactUS) context")
               .font(.caption2)
               .foregroundStyle(.secondary)
           }

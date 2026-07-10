@@ -15,8 +15,8 @@ struct ContextGauge: View {
   var body: some View {
     Menu {
       Section("Context window") {
-        Label("\(remaining.formatted(.number.notation(.compactName))) tokens left", systemImage: "gauge.open.with.lines.needle.33percent")
-        Label("\(used.formatted(.number.notation(.compactName))) of \(window.formatted(.number.notation(.compactName))) used", systemImage: "chart.pie")
+        Label("\(remaining.compactUS) tokens left", systemImage: "gauge.open.with.lines.needle.33percent")
+        Label("\(used.compactUS) of \(window.compactUS) used", systemImage: "chart.pie")
       }
     } label: {
       ZStack {
