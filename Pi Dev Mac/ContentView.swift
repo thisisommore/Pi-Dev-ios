@@ -54,7 +54,7 @@ struct ContentView: View {
 
     private var resizeHandle: some View {
         Rectangle()
-            .fill(Color.primary.opacity(0.06))
+            .fill(Color(white: 0.9))
             .frame(width: 1)
             .frame(maxHeight: .infinity)
             .ignoresSafeArea()
