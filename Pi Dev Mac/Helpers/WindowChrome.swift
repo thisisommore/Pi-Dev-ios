@@ -35,9 +35,10 @@ struct WindowChrome: NSViewRepresentable {
         } else {
             window.styleMask.remove(.fullSizeContentView)
         }
-        // Keep the window base clear so our SwiftUI column fills show through.
-        window.backgroundColor = .clear
-        window.isOpaque = false
+        // Use the standard window background so transient transparent regions
+        // (e.g., during the sidebar show/hide transition) never reveal the desktop.
+        window.backgroundColor = .windowBackgroundColor
+        window.isOpaque = true
         // Traffic lights sit on the content; allow dragging from the titlebar region.
         window.isMovableByWindowBackground = true
     }
