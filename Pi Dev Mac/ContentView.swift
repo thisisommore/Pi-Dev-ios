@@ -52,13 +52,12 @@ struct ContentView: View {
     }
 
     private var resizeHandle: some View {
-        ZStack {
-            Rectangle()
-                .fill(Color(white: colorScheme == .dark ? 0.20 : 0.86))
-                .frame(width: 1)
-            ResizeHandle(width: $sidebarWidth, minWidth: sidebarMin, maxWidth: sidebarMax)
-                .frame(width: 8)
-        }
+        ResizeHandle(
+            width: $sidebarWidth,
+            minWidth: sidebarMin,
+            maxWidth: sidebarMax,
+            lineWhite: colorScheme == .dark ? 0.20 : 0.86
+        )
         .frame(width: 8)
         .frame(maxHeight: .infinity)
         .ignoresSafeArea()

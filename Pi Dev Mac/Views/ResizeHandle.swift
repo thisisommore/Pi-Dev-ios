@@ -16,13 +16,15 @@ struct ResizeHandle: NSViewRepresentable {
     @Binding var width: CGFloat
     var minWidth: CGFloat
     var maxWidth: CGFloat
+    var lineWhite: CGFloat
 
     func makeNSView(context: Context) -> ResizeHandleView {
-        ResizeHandleView(delegate: context.coordinator)
+        ResizeHandleView(delegate: context.coordinator, lineWhite: lineWhite)
     }
 
     func updateNSView(_ nsView: ResizeHandleView, context: Context) {
         nsView.delegate = context.coordinator
+        nsView.lineWhite = lineWhite
     }
 
     func makeCoordinator() -> Coordinator {
@@ -63,9 +65,11 @@ final class ResizeHandleView: NSView {
     private var dragStartX: CGFloat = 0
     private var isDragging = false
     private var cursorPushDepth = 0
+    var lineWhite: CGFloat
 
-    init(delegate: ResizeHandleViewDelegate) {
+    init(delegate: ResizeHandleViewDelegate, lineWhite: CGFloat) {
         self.delegate = delegate
+        self.lineWhite = lineWhite
         super.init(frame: .zero)
     }
 
@@ -73,6 +77,12 @@ final class ResizeHandleView: NSView {
 
     /// Prevent the window from interpreting a press here as a window drag.
     override var mouseDownCanMoveWindow: Bool { false }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let lineRect = NSRect(x: bounds.midX - 0.5, y: 0, width: 1, height: bounds.height)
+        NSColor(white: lineWhite, alpha: 1.0).setFill()
+        lineRect.fill()
+    }
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
