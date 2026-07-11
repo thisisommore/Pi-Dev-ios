@@ -16,6 +16,8 @@ final class ChatStore {
     var selectedModel: AIModelOption
     var selectedThinkingLevel: ThinkingLevel
     var isComposerFocused: Bool = false
+    var isChangesSidebarVisible: Bool = false
+    var selectedChangeFileID: FileChange.ID? = nil
 
     init(sessions: [ChatSession] = MockData.sessions) {
         self.sessions = sessions
@@ -29,6 +31,12 @@ final class ChatStore {
     var selectedSession: ChatSession? {
         guard let selectedSessionID else { return nil }
         return sessions.first { $0.id == selectedSessionID }
+    }
+
+    var selectedFileChange: FileChange? {
+        guard let selectedChangeFileID,
+              let session = selectedSession else { return nil }
+        return session.fileChanges.first { $0.id == selectedChangeFileID }
     }
 
     var filteredSessions: [ChatSession] {
@@ -54,6 +62,7 @@ final class ChatStore {
     func select(_ session: ChatSession) {
         selectedSessionID = session.id
         draft = ""
+        selectedChangeFileID = nil
     }
 
     func newChat(in project: String? = nil) {
@@ -68,6 +77,7 @@ final class ChatStore {
         sessions.insert(session, at: 0)
         selectedSessionID = session.id
         draft = ""
+        selectedChangeFileID = nil
         isComposerFocused = true
     }
 
@@ -76,6 +86,7 @@ final class ChatStore {
         sessions.removeAll { $0.id == session.id }
         if selectedSessionID == session.id {
             selectedSessionID = sessions.first?.id
+            selectedChangeFileID = nil
         }
     }
 

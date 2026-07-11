@@ -12,28 +12,32 @@ enum MockData {
             preview: "Stick with KVAC + Bulletproofs for your system…",
             updatedAt: Date().addingTimeInterval(-60 * 12),
             messages: privacyChat,
-            projectName: "circuit"
+            projectName: "circuit",
+            fileChanges: privacyChanges
         ),
         ChatSession(
             title: "Asymmetric key signing with public key verification",
             preview: "Use Ed25519 for signing and store the public key…",
             updatedAt: Date().addingTimeInterval(-60 * 45),
             messages: signingChat,
-            projectName: "circuit"
+            projectName: "circuit",
+            fileChanges: signingChanges
         ),
         ChatSession(
             title: "Verify attack scenario",
             preview: "The replay path fails when the nonce window rolls…",
             updatedAt: Date().addingTimeInterval(-60 * 90),
             messages: attackChat,
-            projectName: "circuit"
+            projectName: "circuit",
+            fileChanges: attackChanges
         ),
         ChatSession(
             title: "do u find any issues in this, like pr",
             preview: "Two race conditions in the mint path — details below.",
             updatedAt: Date().addingTimeInterval(-60 * 60 * 3),
             messages: prReviewChat,
-            projectName: "circuit"
+            projectName: "circuit",
+            fileChanges: prReviewChanges
         ),
         ChatSession(
             title: "Create bike engine sound",
@@ -54,7 +58,8 @@ enum MockData {
             preview: "Guard the send pipeline with an in-flight token…",
             updatedAt: Date().addingTimeInterval(-60 * 60 * 22),
             messages: iosSendsChat,
-            projectName: "xx-network"
+            projectName: "xx-network",
+            fileChanges: iosSendsChanges
         ),
         ChatSession(
             title: "Create Android mock UI pages",
@@ -68,7 +73,8 @@ enum MockData {
             preview: "I scanned the networking stack and found…",
             updatedAt: Date().addingTimeInterval(-60 * 60 * 40),
             messages: improveChat,
-            projectName: "haven"
+            projectName: "haven",
+            fileChanges: improveChanges
         ),
         ChatSession(
             title: "Capture interval ID and clean up",
@@ -82,14 +88,16 @@ enum MockData {
             preview: "The off-by-one was in the ring buffer write…",
             updatedAt: Date().addingTimeInterval(-60 * 60 * 55),
             messages: bugfixChat,
-            projectName: "haven"
+            projectName: "haven",
+            fileChanges: bugfixChanges
         ),
         ChatSession(
             title: "Find reason for UI thread jank",
             preview: "Main-thread JSON decode on every scroll frame…",
             updatedAt: Date().addingTimeInterval(-60 * 60 * 70),
             messages: jankChat,
-            projectName: "haven"
+            projectName: "haven",
+            fileChanges: jankChanges
         )
     ]
 
@@ -142,6 +150,39 @@ enum MockData {
         )
     ]
 
+    private static let privacyChanges: [FileChange] = [
+        FileChange(
+            path: "Sources/Crypto/KVAC/CredentialBalance.swift",
+            additions: 31,
+            deletions: 12,
+            diff: """
+            @@ -10,12 +10,31 @@ struct CredentialBalance {
+                 let commitment: PedersenCommitment
+                 let proof: Bulletproof
+            +    let key: SharedKey
+            +
+            +    init(
+            +        commitment: PedersenCommitment,
+            +        proof: Bulletproof,
+            +        key: SharedKey
+            +    ) {
+            +        self.commitment = commitment
+            +        self.proof = proof
+            +        self.key = key
+            +    }
+            
+                 func deduct(_ amount: UInt64, with key: SharedKey) throws -> Self {
+            -        let next = try commitment.subtract(amount, using: key)
+            +        let next = try commitment.subtract(amount, using: self.key)
+                     let range = try Bulletproof.prove(next, upperBound: .maxBalance)
+            -        return CredentialBalance(commitment: next, proof: range)
+            +        return CredentialBalance(commitment: next, proof: range, key: key)
+                 }
+             }
+            """
+        )
+    ]
+
     private static let signingChat: [ChatMessage] = [
         ChatMessage(
             role: .user,
@@ -176,6 +217,32 @@ enum MockData {
         )
     ]
 
+    private static let signingChanges: [FileChange] = [
+        FileChange(
+            path: "Sources/Auth/TokenSigner.swift",
+            additions: 14,
+            deletions: 6,
+            diff: """
+            @@ -1,8 +1,14 @@
+             import CryptoKit
+            
+             enum TokenSigner {
+            -    static func sign(_ data: Data, rsaKey: SecKey) throws -> Data {
+            -        // legacy RSA path
+            +    static func sign(_ data: Data) throws -> Data {
+            +        let privateKey = Curve25519.Signing.PrivateKey()
+            +        return try privateKey.signature(for: data)
+            +    }
+            +
+            +    static func verify(_ data: Data, signature: Data, publicKey: Data) throws -> Bool {
+            +        let key = try Curve25519.Signing.PublicKey(rawRepresentation: publicKey)
+            +        return key.isValidSignature(signature, for: data)
+                 }
+             }
+            """
+        )
+    ]
+
     private static let attackChat: [ChatMessage] = [
         ChatMessage(
             role: .user,
@@ -198,6 +265,29 @@ enum MockData {
         )
     ]
 
+    private static let attackChanges: [FileChange] = [
+        FileChange(
+            path: "Sources/Gate/NonceValidator.swift",
+            additions: 27,
+            deletions: 9,
+            diff: """
+            @@ -22,9 +22,27 @@ actor NonceValidator {
+                 func validate(_ nullifier: Nullifier, window: UInt64) async throws {
+                     let key = SpentKey(nullifier: nullifier, window: window)
+            -        guard await spentSet.insert(key).inserted else {
+            -            throw ValidationError.replay
+            +        guard await spentStore.insert(key).inserted else {
+            +            throw ValidationError.replay
+                     }
+            +        let hmac = HMAC<SHA256>.authenticationCode(for: window.bigEndian.data, using: windowKey)
+            +        guard proof.windowHMAC == Data(hmac) else {
+            +            throw ValidationError.invalidWindow
+            +        }
+                 }
+            """
+        )
+    ]
+
     private static let prReviewChat: [ChatMessage] = [
         ChatMessage(
             role: .user,
@@ -215,6 +305,54 @@ enum MockData {
             Suggested PR notes: wrap redeem in a DB transaction with `SELECT … FOR UPDATE`, and write the ledger row first (or use an outbox). Happy to draft the patch.
             """,
             createdAt: Date().addingTimeInterval(-60 * 60 * 3)
+        )
+    ]
+
+    private static let prReviewChanges: [FileChange] = [
+        FileChange(
+            path: "Sources/Mint/RedeemService.swift",
+            additions: 23,
+            deletions: 8,
+            diff: """
+            @@ -45,7 +45,9 @@ final class RedeemService {
+                 func redeem(_ proof: RedeemProof) async throws -> RedeemReceipt {
+            -        let balance = try await ledger.balance(for: proof.key)
+            -        guard balance >= proof.amount else { throw .insufficientFunds }
+            +        try await ledger.transaction { tx in
+            +            let balance = try await tx.balance(for: proof.key)
+            +            guard balance >= proof.amount else { throw .insufficientFunds }
+            +            try await tx.debit(proof.key, amount: proof.amount)
+            +        }
+                     let receipt = RedeemReceipt(proof: proof)
+            -        try await ledger.debit(proof.key, amount: proof.amount)
+                     try await ledger.append(receipt)
+            """
+        ),
+        FileChange(
+            path: "Tests/Mint/RedeemServiceTests.swift",
+            additions: 47,
+            deletions: 3,
+            diff: """
+            @@ -12,6 +12,50 @@ final class RedeemServiceTests: XCTestCase {
+                     let service = RedeemService(ledger: ledger)
+                     _ = try await service.redeem(proof)
+                     XCTAssertEqual(ledger.entries.count, 1)
+            +    }
+            +
+            +    func testConcurrentRedeemPreventsDoubleSpend() async throws {
+            +        let ledger = InMemoryLedger(initialBalance: 100)
+            +        let service = RedeemService(ledger: ledger)
+            +        let proof = RedeemProof(amount: 100)
+            +        await withTaskGroup(of: Void.self) { group in
+            +            for _ in 0..<10 {
+            +                group.addTask {
+            +                    try? await service.redeem(proof)
+            +                }
+            +            }
+            +        }
+            +        XCTAssertEqual(ledger.totalDebited, 100)
+                 }
+            """
         )
     ]
 
@@ -279,6 +417,35 @@ enum MockData {
         )
     ]
 
+    private static let iosSendsChanges: [FileChange] = [
+        FileChange(
+            path: "Sources/iOS/ChatViewModel.swift",
+            additions: 19,
+            deletions: 4,
+            diff: """
+            @@ -32,8 +32,23 @@ final class ChatViewModel: ObservableObject {
+                 @Published var draft: String = ""
+            -    @Published var isSending: Bool = false
+            +    private var sendTask: Task<Void, Never>?
+            
+                 func send() async {
+            -        isSending = true
+            -        defer { isSending = false }
+            -        try? await client.send(draft)
+            +        guard sendTask == nil else { return }
+            +        sendTask = Task {
+            +            defer { sendTask = nil }
+            +            do {
+            +                try await client.send(draft)
+            +            } catch {
+            +                handle(error)
+            +            }
+            +        }
+                 }
+            """
+        )
+    ]
+
     private static let androidUIChat: [ChatMessage] = [
         ChatMessage(
             role: .user,
@@ -302,6 +469,50 @@ enum MockData {
             role: .assistant,
             text: "I scanned the networking stack and found three high-ROI changes: unify retry policy, cancel in-flight requests on logout, and move JSON decode off the main actor.",
             createdAt: Date().addingTimeInterval(-60 * 60 * 40)
+        )
+    ]
+
+    private static let improveChanges: [FileChange] = [
+        FileChange(
+            path: "Sources/Network/RequestCoordinator.swift",
+            additions: 18,
+            deletions: 42,
+            diff: """
+            @@ -88,20 +88,12 @@ actor RequestCoordinator {
+                 func perform<T: Decodable>(_ request: Request<T>) async throws -> T {
+            -        return try await withRetry(policy: .default) {
+            -            let (data, response) = try await urlSession.data(for: request.urlRequest)
+            -            try Task.checkCancellation()
+            -            return try JSONDecoder().decode(T.self, from: data)
+            -        }
+            +        let (data, _) = try await urlSession.data(for: request.urlRequest)
+            +        return try await Task.detached(priority: .userInitiated) {
+            +            try JSONDecoder().decode(T.self, from: data)
+            +        }.value
+                 }
+            """
+        ),
+        FileChange(
+            path: "Sources/Network/RetryPolicy.swift",
+            additions: 56,
+            deletions: 0,
+            diff: """
+            @@ -0,0 +1,56 @@
+            +import Foundation
+            +
+            +struct RetryPolicy {
+            +    let maxAttempts: Int
+            +    let baseDelay: Duration
+            +    let maxDelay: Duration
+            +
+            +    static let `default` = RetryPolicy(maxAttempts: 3, baseDelay: .milliseconds(200), maxDelay: .seconds(5))
+            +
+            +    func delay(forAttempt attempt: Int) -> Duration {
+            +        let exponential = baseDelay * Int(pow(2.0, Double(attempt)))
+            +        return min(exponential, maxDelay)
+            +    }
+            +}
+            """
         )
     ]
 
@@ -331,6 +542,25 @@ enum MockData {
         )
     ]
 
+    private static let bugfixChanges: [FileChange] = [
+        FileChange(
+            path: "Sources/Utils/RingBuffer.swift",
+            additions: 7,
+            deletions: 3,
+            diff: """
+            @@ -18,9 +18,13 @@ struct RingBuffer<Element> {
+                 mutating func append(_ element: Element) {
+            -        writeIndex &= capacity - 1
+                     buffer[writeIndex] = element
+            -        writeIndex += 1
+            +        writeIndex += 1
+            +        writeIndex &= capacity - 1
+                     count = min(count + 1, capacity)
+                 }
+            """
+        )
+    ]
+
     private static let jankChat: [ChatMessage] = [
         ChatMessage(
             role: .user,
@@ -341,6 +571,32 @@ enum MockData {
             role: .assistant,
             text: "Main-thread JSON decode on every scroll frame was the culprit — pre-decode message bodies when they arrive and only bind lightweight view models in the list.",
             createdAt: Date().addingTimeInterval(-60 * 60 * 70)
+        )
+    ]
+
+    private static let jankChanges: [FileChange] = [
+        FileChange(
+            path: "Sources/UI/MessageListViewModel.swift",
+            additions: 34,
+            deletions: 12,
+            diff: """
+            @@ -40,18 +40,30 @@ final class MessageListViewModel: ObservableObject {
+                 func loadMessages() async {
+            -        let decoded = messages.map { try! JSONDecoder().decode(MessageViewModel.self, from: $0.body) }
+            -        await MainActor.run {
+            -            self.viewModels = decoded
+            -        }
+            +        let viewModels = await Task.detached(priority: .userInitiated) {
+            +            messages.map { message in
+            +                MessageViewModel(
+            +                    id: message.id,
+            +                    renderedBody: render(message.body)
+            +                )
+            +            }
+            +        }.value
+            +        self.viewModels = viewModels
+                 }
+            """
         )
     ]
 }

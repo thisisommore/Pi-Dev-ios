@@ -11,7 +11,9 @@ struct ChatDetailView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if let session = store.selectedSession {
+            if let change = store.selectedFileChange, store.isChangesSidebarVisible {
+                FileDiffView(change: change)
+            } else if let session = store.selectedSession {
                 if session.messages.isEmpty {
                     EmptyStateView(store: store, sessionTitle: session.title)
                 } else {
@@ -46,6 +48,7 @@ struct ChatDetailView: View {
                     .foregroundStyle(.primary)
             }
             .sharedBackgroundVisibility(.hidden)
+
         }
     }
 

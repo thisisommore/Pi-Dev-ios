@@ -17,30 +17,38 @@ struct ResizeHandle: NSViewRepresentable {
     var minWidth: CGFloat
     var maxWidth: CGFloat
     var lineWhite: CGFloat
+    /// When true, paint the left half with the detail background and the
+    /// right half with the sidebar background (used for the right sidebar).
+    var isRightSide: Bool = false
+    /// Inverts the drag delta so the handle can resize a sidebar on the right edge.
+    var inverted: Bool = false
 
     func makeNSView(context: Context) -> ResizeHandleView {
-        ResizeHandleView(delegate: context.coordinator, lineWhite: lineWhite)
+        ResizeHandleView(delegate: context.coordinator, lineWhite: lineWhite, isRightSide: isRightSide)
     }
 
     func updateNSView(_ nsView: ResizeHandleView, context: Context) {
         nsView.delegate = context.coordinator
         nsView.lineWhite = lineWhite
+        nsView.isRightSide = isRightSide
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(width: $width, minWidth: minWidth, maxWidth: maxWidth)
+        Coordinator(width: $width, minWidth: minWidth, maxWidth: maxWidth, inverted: inverted)
     }
 
     final class Coordinator: ResizeHandleViewDelegate {
         @Binding var width: CGFloat
         let minWidth: CGFloat
         let maxWidth: CGFloat
+        let inverted: Bool
         private var dragStartWidth: CGFloat = 0
 
-        init(width: Binding<CGFloat>, minWidth: CGFloat, maxWidth: CGFloat) {
+        init(width: Binding<CGFloat>, minWidth: CGFloat, maxWidth: CGFloat, inverted: Bool = false) {
             self._width = width
             self.minWidth = minWidth
             self.maxWidth = maxWidth
+            self.inverted = inverted
         }
 
         func resizeBegan() {
@@ -48,7 +56,8 @@ struct ResizeHandle: NSViewRepresentable {
         }
 
         func resizeChanged(delta: CGFloat) {
-            let next = dragStartWidth + delta
+            let effectiveDelta = inverted ? -delta : delta
+            let next = dragStartWidth + effectiveDelta
             width = min(maxWidth, max(minWidth, next))
         }
     }
@@ -66,10 +75,12 @@ final class ResizeHandleView: NSView {
     private var isDragging = false
     private var cursorPushDepth = 0
     var lineWhite: CGFloat
+    var isRightSide: Bool
 
-    init(delegate: ResizeHandleViewDelegate, lineWhite: CGFloat) {
+    init(delegate: ResizeHandleViewDelegate, lineWhite: CGFloat, isRightSide: Bool = false) {
         self.delegate = delegate
         self.lineWhite = lineWhite
+        self.isRightSide = isRightSide
         super.init(frame: .zero)
     }
 
@@ -79,19 +90,24 @@ final class ResizeHandleView: NSView {
     override var mouseDownCanMoveWindow: Bool { false }
 
     override func draw(_ dirtyRect: NSRect) {
-        // The window background is clear, so the entire 8 pt handle must be
-        // painted to avoid seeing through to the desktop. Fill the left and
-        // right halves with the adjacent column colors, then draw the 1 pt
-        // divider line in the center.
+        // Paint the entire 8 pt handle so no underlying content shows through.
+        // Fill the left and right halves with the adjacent column colors, then
+        // draw the 1 pt divider line in the center.
         let midX = bounds.midX
         let leftRect = NSRect(x: 0, y: 0, width: midX, height: bounds.height)
         let rightRect = NSRect(x: midX, y: 0, width: bounds.width - midX, height: bounds.height)
 
-        NSColor.controlBackgroundColor.setFill()
-        leftRect.fill()
-
-        NSColor.textBackgroundColor.setFill()
-        rightRect.fill()
+        if isRightSide {
+            NSColor.textBackgroundColor.setFill()
+            leftRect.fill()
+            NSColor.controlBackgroundColor.setFill()
+            rightRect.fill()
+        } else {
+            NSColor.controlBackgroundColor.setFill()
+            leftRect.fill()
+            NSColor.textBackgroundColor.setFill()
+            rightRect.fill()
+        }
 
         let lineRect = NSRect(x: midX - 0.5, y: 0, width: 1, height: bounds.height)
         NSColor(white: lineWhite, alpha: 1.0).setFill()

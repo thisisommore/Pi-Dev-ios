@@ -47,6 +47,34 @@ struct CodeBlock: Identifiable, Hashable, Sendable {
     }
 }
 
+// MARK: - File change
+
+struct FileChange: Identifiable, Hashable, Sendable {
+    let id: UUID
+    var path: String
+    var additions: Int
+    var deletions: Int
+    var diff: String
+
+    init(
+        id: UUID = UUID(),
+        path: String,
+        additions: Int,
+        deletions: Int,
+        diff: String
+    ) {
+        self.id = id
+        self.path = path
+        self.additions = additions
+        self.deletions = deletions
+        self.diff = diff
+    }
+
+    var fileName: String {
+        (path as NSString).lastPathComponent
+    }
+}
+
 // MARK: - Session
 
 struct ChatSession: Identifiable, Hashable, Sendable {
@@ -56,6 +84,7 @@ struct ChatSession: Identifiable, Hashable, Sendable {
     var updatedAt: Date
     var messages: [ChatMessage]
     var projectName: String?
+    var fileChanges: [FileChange]
 
     init(
         id: UUID = UUID(),
@@ -63,7 +92,8 @@ struct ChatSession: Identifiable, Hashable, Sendable {
         preview: String = "",
         updatedAt: Date = .now,
         messages: [ChatMessage] = [],
-        projectName: String? = nil
+        projectName: String? = nil,
+        fileChanges: [FileChange] = []
     ) {
         self.id = id
         self.title = title
@@ -71,6 +101,7 @@ struct ChatSession: Identifiable, Hashable, Sendable {
         self.updatedAt = updatedAt
         self.messages = messages
         self.projectName = projectName
+        self.fileChanges = fileChanges
     }
 
     var relativeUpdated: String {
