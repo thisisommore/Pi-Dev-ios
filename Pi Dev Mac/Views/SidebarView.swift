@@ -106,8 +106,8 @@ struct SidebarView: View {
             .padding(.leading, rowOuterLeading)
             .padding(.trailing, rowOuterTrailing)
             .padding(.bottom, 8)
+            .background(ScrollViewStyleConfigurator())
         }
-        .scrollIndicators(.hidden)
         .contentMargins(.trailing, 0, for: .scrollContent)
         .scrollContentBackground(.hidden)
         .background(Color.clear)
@@ -214,6 +214,35 @@ struct SidebarView: View {
         .overlay(alignment: .top) {
             Divider()
         }
+    }
+}
+
+/// Configures the backing `NSScrollView` to use the thin overlay scroller
+/// style so the scrollbar is narrow when it appears.
+private struct ScrollViewStyleConfigurator: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        view.isHidden = true
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            guard let scrollView = nsView.firstAncestor(ofType: NSScrollView.self) else { return }
+            scrollView.scrollerStyle = .overlay
+            scrollView.verticalScroller?.controlSize = .small
+        }
+    }
+}
+
+private extension NSView {
+    func firstAncestor<T: NSView>(ofType type: T.Type) -> T? {
+        var current: NSView? = self.superview
+        while let view = current {
+            if let match = view as? T { return match }
+            current = view.superview
+        }
+        return nil
     }
 }
 
