@@ -60,11 +60,11 @@ struct SidebarView: View {
     // MARK: - List
 
     /// Outer gap before the selection background (right of the row pill).
-    private let rowOuterTrailing: CGFloat = 2
+    private let rowOuterTrailing: CGFloat = 0
     /// Outer gap on the left — +1 so it visually matches the right side.
     private let rowOuterLeading: CGFloat = 4
     /// Inner text padding inside the selection background.
-    private let rowInnerPadding: CGFloat = 12
+    private let rowInnerPadding: CGFloat = 8
 
     private var sessionList: some View {
         // ScrollView instead of List — full control over side padding
@@ -80,7 +80,7 @@ struct SidebarView: View {
                         } header: {
                             projectHeader(group.project)
                                 .padding(.leading, 13)
-                                .padding(.trailing, 4)
+                                .padding(.trailing, 0)
                                 .padding(.top, 10)
                                 .padding(.bottom, 4)
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -108,7 +108,7 @@ struct SidebarView: View {
             .padding(.bottom, 8)
             .background(ScrollViewStyleConfigurator())
         }
-        .contentMargins(.trailing, 0, for: .scrollContent)
+        .contentMargins(.trailing, -8, for: .scrollContent)
         .scrollContentBackground(.hidden)
         .background(Color.clear)
     }
@@ -229,6 +229,9 @@ private struct ScrollViewStyleConfigurator: NSViewRepresentable {
         DispatchQueue.main.async {
             guard let scrollView = nsView.firstAncestor(ofType: NSScrollView.self) else { return }
             scrollView.scrollerStyle = .overlay
+            scrollView.automaticallyAdjustsContentInsets = false
+            scrollView.contentInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
+            scrollView.scrollerInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: -4)
             if !(scrollView.verticalScroller is SidebarScroller) {
                 let scroller = SidebarScroller()
                 scroller.controlSize = .small
@@ -242,6 +245,13 @@ private struct ScrollViewStyleConfigurator: NSViewRepresentable {
 private final class SidebarScroller: NSScroller {
     private var trackingArea: NSTrackingArea?
     private var isHovered = false
+
+    override class func scrollerWidth(for controlSize: NSControl.ControlSize, scrollerStyle: NSScroller.Style) -> CGFloat {
+        if controlSize == .small {
+            return 8
+        }
+        return super.scrollerWidth(for: controlSize, scrollerStyle: scrollerStyle)
+    }
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
@@ -257,12 +267,12 @@ private final class SidebarScroller: NSScroller {
 
     override func mouseEntered(with event: NSEvent) {
         isHovered = true
-        needsDisplay = true
+        setNeedsDisplay()
     }
 
     override func mouseExited(with event: NSEvent) {
         isHovered = false
-        needsDisplay = true
+        setNeedsDisplay()
     }
 
     override func drawKnob() {
@@ -277,7 +287,7 @@ private final class SidebarScroller: NSScroller {
             color = NSColor(white: 0.45, alpha: 0.55)
         }
         color.setFill()
-        NSBezierPath(roundedRect: knobRect.insetBy(dx: 1, dy: 0), xRadius: 2, yRadius: 2).fill()
+        NSBezierPath(roundedRect: knobRect.insetBy(dx: 0, dy: 0), xRadius: 2, yRadius: 2).fill()
     }
 
     override func drawKnobSlot(in slotRect: NSRect, highlight: Bool) {
