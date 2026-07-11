@@ -217,8 +217,7 @@ struct SidebarView: View {
     }
 }
 
-/// Configures the backing `NSScrollView` to use the thin overlay scroller
-/// style so the scrollbar is narrow when it appears.
+/// Configures the backing `NSScrollView` to use a thin, dark overlay scroller.
 private struct ScrollViewStyleConfigurator: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
@@ -230,8 +229,31 @@ private struct ScrollViewStyleConfigurator: NSViewRepresentable {
         DispatchQueue.main.async {
             guard let scrollView = nsView.firstAncestor(ofType: NSScrollView.self) else { return }
             scrollView.scrollerStyle = .overlay
-            scrollView.verticalScroller?.controlSize = .small
+            if !(scrollView.verticalScroller is SidebarScroller) {
+                let scroller = SidebarScroller()
+                scroller.controlSize = .small
+                scrollView.verticalScroller = scroller
+            }
         }
+    }
+}
+
+/// A darker overlay-style vertical scroller so the knob doesn't look too white.
+private final class SidebarScroller: NSScroller {
+    override func drawKnob() {
+        let knobRect = rect(for: .knob)
+        let color: NSColor
+        if effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua {
+            color = NSColor(white: 0.50, alpha: 0.70)
+        } else {
+            color = NSColor(white: 0.45, alpha: 0.55)
+        }
+        color.setFill()
+        NSBezierPath(roundedRect: knobRect.insetBy(dx: 1, dy: 0), xRadius: 2, yRadius: 2).fill()
+    }
+
+    override func drawKnobSlot(in slotRect: NSRect, highlight: Bool) {
+        // Keep the slot transparent so only the floating knob is visible.
     }
 }
 
