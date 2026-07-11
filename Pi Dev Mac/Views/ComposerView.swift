@@ -18,7 +18,7 @@ struct ComposerView: View {
             composerCard
         }
         .padding(.horizontal, 24)
-        .padding(.bottom, 18)
+        .padding(.bottom, 12)
         .padding(.top, 8)
         .frame(maxWidth: 820)
         .frame(maxWidth: .infinity)
@@ -51,7 +51,8 @@ struct ComposerView: View {
             }
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 12)
+        .padding(.top, 10)
+        .padding(.bottom, 6)
         .background {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(.background)
