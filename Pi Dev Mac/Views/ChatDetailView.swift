@@ -39,6 +39,13 @@ struct ChatDetailView: View {
                 }
                 .help(isSidebarVisible ? "Hide sidebar" : "Show sidebar")
             }
+
+            ToolbarItem(placement: .cancellationAction) {
+                Text("Pi Dev")
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(.primary)
+            }
+            .sharedBackgroundVisibility(.hidden)
         }
     }
 
