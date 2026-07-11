@@ -9,8 +9,6 @@ import SwiftUI
 struct ContentView: View {
     @State private var store = ChatStore()
     @State private var sidebarWidth: CGFloat = 280
-    @State private var dragStartWidth: CGFloat = 280
-    @State private var isResizing = false
     @State private var isSidebarVisible = true
     @Environment(\.colorScheme) private var colorScheme
 
@@ -54,40 +52,17 @@ struct ContentView: View {
     }
 
     private var resizeHandle: some View {
-        Rectangle()
-            .fill(Color(white: colorScheme == .dark ? 0.20 : 0.86))
-            .frame(width: 1)
-            .frame(maxHeight: .infinity)
-            .ignoresSafeArea()
-            .overlay {
-                // Wider hit target for dragging
-                Rectangle()
-                    .fill(Color.clear)
-                    .frame(width: 8)
-                    .contentShape(Rectangle())
-                    .gesture(
-                        DragGesture(minimumDistance: 1)
-                            .onChanged { value in
-                                if !isResizing {
-                                    isResizing = true
-                                    dragStartWidth = sidebarWidth
-                                }
-                                let next = dragStartWidth + value.translation.width
-                                sidebarWidth = min(sidebarMax, max(sidebarMin, next))
-                            }
-                            .onEnded { _ in
-                                isResizing = false
-                            }
-                    )
-                    .onHover { hovering in
-                        if hovering {
-                            NSCursor.resizeLeftRight.push()
-                        } else {
-                            NSCursor.pop()
-                        }
-                    }
-            }
-            .zIndex(1)
+        ZStack {
+            Rectangle()
+                .fill(Color(white: colorScheme == .dark ? 0.20 : 0.86))
+                .frame(width: 1)
+            ResizeHandle(width: $sidebarWidth, minWidth: sidebarMin, maxWidth: sidebarMax)
+                .frame(width: 8)
+        }
+        .frame(width: 8)
+        .frame(maxHeight: .infinity)
+        .ignoresSafeArea()
+        .zIndex(1)
     }
 }
 
