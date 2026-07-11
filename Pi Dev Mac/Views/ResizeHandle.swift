@@ -79,7 +79,21 @@ final class ResizeHandleView: NSView {
     override var mouseDownCanMoveWindow: Bool { false }
 
     override func draw(_ dirtyRect: NSRect) {
-        let lineRect = NSRect(x: bounds.midX - 0.5, y: 0, width: 1, height: bounds.height)
+        // The window background is clear, so the entire 8 pt handle must be
+        // painted to avoid seeing through to the desktop. Fill the left and
+        // right halves with the adjacent column colors, then draw the 1 pt
+        // divider line in the center.
+        let midX = bounds.midX
+        let leftRect = NSRect(x: 0, y: 0, width: midX, height: bounds.height)
+        let rightRect = NSRect(x: midX, y: 0, width: bounds.width - midX, height: bounds.height)
+
+        NSColor.controlBackgroundColor.setFill()
+        leftRect.fill()
+
+        NSColor.textBackgroundColor.setFill()
+        rightRect.fill()
+
+        let lineRect = NSRect(x: midX - 0.5, y: 0, width: 1, height: bounds.height)
         NSColor(white: lineWhite, alpha: 1.0).setFill()
         lineRect.fill()
     }
