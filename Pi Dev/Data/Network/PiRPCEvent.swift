@@ -263,6 +263,10 @@ struct AgentModel: Decodable, Sendable {
 struct AnyCodable: Decodable, @unchecked Sendable {
   let value: Any
 
+  init(value: Any) {
+    self.value = value
+  }
+
   init(from decoder: Decoder) throws {
     let container = try decoder.singleValueContainer()
     if let bool = try? container.decode(Bool.self) { value = bool }

@@ -17,7 +17,7 @@ struct MessageList: View {
         ScrollView {
           LazyVStack(spacing: 12) {
             ForEach(store.messages) { message in
-              MessageRow(message: message, store: store)
+              MessageRow(messageId: message.id, store: store)
                 .id(message.id)
                 .transition(.asymmetric(
                   insertion: .move(edge: .bottom).combined(with: .opacity),

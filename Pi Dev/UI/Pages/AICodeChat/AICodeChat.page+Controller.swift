@@ -146,19 +146,36 @@ final class ChatStore: Identifiable {
       let response = try await rpcClient.getEntries()
       guard let entries = response.data?.entries else { return }
 
-      let chatMessages = entries.compactMap { entry -> ChatMessage? in
-        guard entry.type == "message", let agentMessage = entry.message else { return nil }
-        guard let role = agentMessage.role else { return nil }
+      // Walk entries in order so toolResult messages can be attached to the
+      // preceding assistant tool call (they are stored as separate entries).
+      var chatMessages: [ChatMessage] = []
+      for entry in entries {
+        guard entry.type == "message", let agentMessage = entry.message else { continue }
+        guard let role = agentMessage.role else { continue }
         let text = agentMessage.content?.textBlocks().joined(separator: "\n\n") ?? ""
 
         if role == "user" {
-          return ChatMessage(entryId: entry.id, role: .user, text: text, tokens: 0)
+          chatMessages.append(ChatMessage(entryId: entry.id, role: .user, text: text, tokens: 0))
         } else if role == "assistant" {
           var message = ChatMessage(entryId: entry.id, role: .assistant, text: text, tokens: 0)
           self.populate(message: &message, from: agentMessage)
-          return message
+          chatMessages.append(message)
+        } else if role == "toolResult" {
+          let output = text
+          let toolCallId = agentMessage.toolCallId
+          let toolName = agentMessage.toolName ?? "tool"
+          let isError = agentMessage.isError ?? false
+          // Attach to the most recent assistant message that owns this tool call.
+          if let idx = chatMessages.lastIndex(where: { $0.role == .assistant }) {
+            attachToolOutput(
+              to: &chatMessages[idx],
+              toolCallId: toolCallId,
+              toolName: toolName,
+              output: output,
+              isError: isError
+            )
+          }
         }
-        return nil
       }
 
       let state = try await rpcClient.getState()
@@ -188,7 +205,13 @@ final class ChatStore: Identifiable {
     let toolCalls = agentMessage.content?.toolCalls() ?? []
     message.tools = toolCalls.map { call in
       let detail = formatToolDetail(name: call.name, arguments: call.arguments)
-      return ToolUse(kind: toolKind(for: call.name), name: call.name, detail: detail, symbol: toolSymbol(for: call.name))
+      return ToolUse(
+        toolCallId: call.id,
+        kind: toolKind(for: call.name),
+        name: call.name,
+        detail: detail,
+        symbol: toolSymbol(for: call.name)
+      )
     }
 
     let (textWithoutCode, code) = stripFirstCodeBlock(from: message.text)
@@ -465,6 +488,7 @@ final class ChatStore: Identifiable {
           updateMessage(at: messageIndex) {
             $0.tools.append(
               ToolUse(
+                toolCallId: call.id,
                 kind: toolKind(for: call.name),
                 name: call.name,
                 detail: detail,
@@ -477,21 +501,112 @@ final class ChatStore: Identifiable {
           break
         }
 
+      case .toolExecutionStart(let toolCallId, let toolName, let args):
+        if !toolCallId.isEmpty { latestToolNames[toolCallId] = toolName }
+        let detail = formatToolDetail(name: toolName, arguments: stringAnyCodableArgs(args))
+        updateMessage(at: messageIndex) {
+          // Ensure a chip exists even if toolcall_end was missed or raced.
+          if let idx = $0.tools.lastIndex(where: { $0.toolCallId == toolCallId }) {
+            if $0.tools[idx].detail.isEmpty, !detail.isEmpty {
+              var tools = $0.tools
+              tools[idx] = ToolUse(
+                toolCallId: toolCallId,
+                kind: toolKind(for: toolName),
+                name: toolName,
+                detail: detail,
+                symbol: toolSymbol(for: toolName),
+                output: tools[idx].output,
+                exitCode: tools[idx].exitCode
+              )
+              $0.tools = tools
+            }
+            return
+          }
+          if let idx = $0.tools.lastIndex(where: { $0.name == toolName && $0.output == nil }) {
+            $0.tools[idx].toolCallId = toolCallId.isEmpty ? $0.tools[idx].toolCallId : toolCallId
+            return
+          }
+          $0.tools.append(
+            ToolUse(
+              toolCallId: toolCallId.isEmpty ? nil : toolCallId,
+              kind: toolKind(for: toolName),
+              name: toolName,
+              detail: detail,
+              symbol: toolSymbol(for: toolName)
+            )
+          )
+        }
+
+      case .toolExecutionUpdate(let toolCallId, let partialResult):
+        let name = latestToolNames[toolCallId] ?? "tool"
+        let output = toolResultText(partialResult)
+        guard !output.isEmpty else { break }
+        updateMessage(at: messageIndex) {
+          attachToolOutput(to: &$0, toolCallId: toolCallId, toolName: name, output: output, isError: false, exitCode: nil)
+        }
+
       case .toolExecutionEnd(let toolCallId, let toolName, let result, let isError):
         let name = latestToolNames[toolCallId] ?? toolName
-        if name == "bash" {
-          let command = result.details?["command"]?.value as? String ?? ""
-          let exitCode = (result.details?["exitCode"]?.value as? Int) ?? (isError ? 1 : 0)
-          updateMessage(at: messageIndex) {
-            $0.terminal.append(TerminalRun(command: command, output: result.textOutput, exitCode: exitCode))
+        let exitCode = intValue(result.details?["exitCode"]?.value) ?? (isError ? 1 : 0)
+        let output = toolResultText(result)
+        print("[ChatStore] toolExecutionEnd id=\(toolCallId) name=\(name) outputChars=\(output.count) isError=\(isError)")
+        updateMessage(at: messageIndex) {
+          attachToolOutput(
+            to: &$0,
+            toolCallId: toolCallId,
+            toolName: name,
+            output: output,
+            isError: isError,
+            exitCode: exitCode
+          )
+          if name == "bash" || name.lowercased().contains("bash") {
+            let command = (result.details?["command"]?.value as? String)
+              ?? $0.tools.last(where: { $0.toolCallId == toolCallId })?.detail
+              ?? ""
+            $0.terminal.append(TerminalRun(command: command, output: output, exitCode: exitCode))
           }
         }
 
       case .messageEnd(let message):
-        print("[ChatStore] messageEnd")
+        print("[ChatStore] messageEnd role=\(message.role ?? "nil")")
         updateThinkingSeconds()
-        if message.role == "assistant" {
+        if message.role == "toolResult" {
+          // Backup path: server also emits tool results as standalone messages.
+          let output = message.content?.textBlocks().joined(separator: "\n") ?? ""
+          let toolCallId = message.toolCallId ?? ""
+          let name = message.toolName ?? latestToolNames[toolCallId] ?? "tool"
+          let isError = message.isError ?? false
+          print("[ChatStore] toolResult messageEnd id=\(toolCallId) outputChars=\(output.count)")
+          updateMessage(at: messageIndex) {
+            attachToolOutput(
+              to: &$0,
+              toolCallId: toolCallId.isEmpty ? nil : toolCallId,
+              toolName: name,
+              output: output,
+              isError: isError,
+              exitCode: isError ? 1 : 0
+            )
+          }
+        } else if message.role == "assistant" {
           finalize(message: message, at: messageIndex)
+        }
+
+      case .turnEnd(_, let toolResults):
+        // turn_end.toolResults are full toolResult payloads (with content text).
+        for result in toolResults {
+          let output = toolResultText(result)
+          guard !output.isEmpty else { continue }
+          updateMessage(at: messageIndex) {
+            // Prefer last bash/tool without output; turn_end results lack toolCallId on AgentToolResult.
+            attachToolOutput(
+              to: &$0,
+              toolCallId: nil,
+              toolName: $0.tools.last(where: { $0.output == nil })?.name ?? "bash",
+              output: output,
+              isError: false,
+              exitCode: 0
+            )
+          }
         }
 
       case .agentEnd(let messages):
@@ -599,6 +714,78 @@ final class ChatStore: Identifiable {
     case let n where n.contains("bash") || n.contains("run"): return "terminal"
     case let n where n.contains("test"): return "checkmark.seal"
     default: return "gearshape.2"
+    }
+  }
+
+  /// Attach stdout/result text onto the matching tool chip, replacing the tools
+  /// array so Observation/SwiftUI always picks up the nested change.
+  private func attachToolOutput(
+    to message: inout ChatMessage,
+    toolCallId: String?,
+    toolName: String,
+    output: String,
+    isError: Bool,
+    exitCode: Int? = nil
+  ) {
+    let resolvedExit = exitCode ?? (isError ? 1 : 0)
+    var tools = message.tools
+
+    let index: Int? = {
+      if let toolCallId, !toolCallId.isEmpty,
+         let idx = tools.lastIndex(where: { $0.toolCallId == toolCallId }) {
+        return idx
+      }
+      if let idx = tools.lastIndex(where: { $0.name == toolName && ($0.output == nil || $0.output?.isEmpty == true) }) {
+        return idx
+      }
+      if let idx = tools.lastIndex(where: { $0.name == toolName }) {
+        return idx
+      }
+      return tools.lastIndex(where: { $0.output == nil || $0.output?.isEmpty == true })
+    }()
+
+    if let index {
+      tools[index].toolCallId = tools[index].toolCallId ?? toolCallId
+      tools[index].output = output
+      tools[index].exitCode = resolvedExit
+    } else {
+      tools.append(
+        ToolUse(
+          toolCallId: toolCallId,
+          kind: toolKind(for: toolName),
+          name: toolName,
+          detail: "",
+          symbol: toolSymbol(for: toolName),
+          output: output,
+          exitCode: resolvedExit
+        )
+      )
+    }
+    message.tools = tools
+  }
+
+  private func toolResultText(_ result: AgentToolResult) -> String {
+    let fromContent = result.textOutput.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !fromContent.isEmpty { return result.textOutput }
+    if let s = result.details?["output"]?.value as? String, !s.isEmpty { return s }
+    if let s = result.details?["stdout"]?.value as? String, !s.isEmpty { return s }
+    if let s = result.details?["text"]?.value as? String, !s.isEmpty { return s }
+    return result.textOutput
+  }
+
+  private func stringAnyCodableArgs(_ args: [String: Any]) -> [String: AnyCodable] {
+    // Wrap raw SSE args so formatToolDetail can read preferred keys.
+    Dictionary(uniqueKeysWithValues: args.map { key, value in
+      (key, AnyCodable(value: value))
+    })
+  }
+
+  private func intValue(_ value: Any?) -> Int? {
+    switch value {
+    case let i as Int: return i
+    case let n as NSNumber: return n.intValue
+    case let s as String: return Int(s)
+    default: return nil
     }
   }
 

@@ -104,7 +104,20 @@ enum AICodeChatMock {
     }
 
     reply.tools = [
-      ToolUse(kind: .builtin, name: "bash", detail: "cd Mini-C-Compiler && git log -1 --format=\"%H%n%an%n%ae%n%ad%n%s\"", symbol: "terminal"),
+      ToolUse(
+        kind: .builtin,
+        name: "bash",
+        detail: "cd Mini-C-Compiler && git log -1 --format=\"%H%n%an%n%ae%n%ad%n%s\"",
+        symbol: "terminal",
+        output: """
+        a1b2c3d4e5f6789012345678901234567890abcd
+        Alice Developer
+        alice@example.com
+        Mon Jul 7 14:22:11 2025 -0700
+        Fix parser edge case for nested blocks
+        """,
+        exitCode: 0
+      ),
       ToolUse(kind: .builtin, name: "Search for .swift", detail: "Found SearchViewModel.swift, SearchView.swift, RepositoryClient.swift, SearchViewModelTests.swift", symbol: "magnifyingglass"),
       ToolUse(kind: .builtin, name: "Edit SearchViewModel.swift", detail: "+41 −4", symbol: "pencil.line"),
       ToolUse(kind: .builtin, name: "Edit RepositoryClient.swift", detail: "+28 −12", symbol: "pencil.line"),

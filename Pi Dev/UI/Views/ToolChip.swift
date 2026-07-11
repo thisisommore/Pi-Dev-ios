@@ -26,36 +26,74 @@ struct ToolChip: View {
     return n == "bash" || n.contains("bash") || n.contains("run") || n.contains("shell")
       || tool.detail.hasPrefix("command:")
   }
+  private var hasOutput: Bool {
+    guard let output = tool.output else { return false }
+    return !output.isEmpty
+  }
+  private var failed: Bool {
+    if let code = tool.exitCode { return code != 0 }
+    return false
+  }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 4) {
-      HStack(alignment: .firstTextBaseline, spacing: 6) {
-        Text(tool.name)
-          .font(.caption)
-          .foregroundStyle(.secondary)
+    VStack(alignment: .leading, spacing: 0) {
+      VStack(alignment: .leading, spacing: 4) {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+          Text(tool.name)
+            .font(.caption)
+            .foregroundStyle(.secondary)
 
-        if isDiff {
-          DiffLabel(text: tool.detail)
+          if isDiff {
+            DiffLabel(text: tool.detail)
+          }
+
+          Spacer(minLength: 0)
+
+          if tool.exitCode != nil {
+            Image(systemName: failed ? "xmark" : "checkmark")
+              .font(.system(size: 10, weight: .semibold))
+              .foregroundStyle(failed ? .red : .green.opacity(0.85))
+          }
         }
 
-        Spacer(minLength: 0)
+        if !tool.detail.isEmpty && !isDiff {
+          Text(displayDetail)
+            .font(isCommand
+                  ? .system(size: 12, design: .monospaced)
+                  : .caption)
+            .foregroundStyle(.primary.opacity(0.75))
+            .lineLimit(isCommand ? 6 : 3)
+            .multilineTextAlignment(.leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .textSelection(.enabled)
+        }
       }
+      .padding(.horizontal, 12)
+      .padding(.vertical, 10)
 
-      if !tool.detail.isEmpty && !isDiff {
-        Text(displayDetail)
-          .font(isCommand
-                ? .system(size: 12, design: .monospaced)
-                : .caption)
-          .foregroundStyle(.primary.opacity(0.75))
-          .lineLimit(isCommand ? 6 : 3)
+      if hasOutput {
+        Divider().opacity(0.35)
+
+        Text(tool.output ?? "")
+          .font(.system(size: 11, design: .monospaced))
+          .foregroundStyle(.secondary)
           .multilineTextAlignment(.leading)
           .fixedSize(horizontal: false, vertical: true)
           .frame(maxWidth: .infinity, alignment: .leading)
           .textSelection(.enabled)
+          .padding(.horizontal, 12)
+          .padding(.vertical, 10)
+
+        if failed, let code = tool.exitCode {
+          Text("exit \(code)")
+            .font(.system(size: 10, weight: .medium, design: .monospaced))
+            .foregroundStyle(.red.opacity(0.9))
+            .padding(.horizontal, 12)
+            .padding(.bottom, 10)
+        }
       }
     }
-    .padding(.horizontal, 12)
-    .padding(.vertical, 10)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(.secondary.opacity(0.08), in: .rect(cornerRadius: 12))
   }
