@@ -82,7 +82,7 @@ struct SidebarView: View {
                                 .padding(.leading, 8)
                                 .padding(.trailing, 0)
                                 .padding(.top, 10)
-                                .padding(.bottom, 4)
+                                .padding(.bottom, 0)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .background(Color(nsColor: .controlBackgroundColor))
                         }
