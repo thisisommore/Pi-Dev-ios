@@ -238,12 +238,40 @@ private struct ScrollViewStyleConfigurator: NSViewRepresentable {
     }
 }
 
-/// A darker overlay-style vertical scroller so the knob doesn't look too white.
+/// A darker overlay-style vertical scroller that brightens on hover.
 private final class SidebarScroller: NSScroller {
+    private var trackingArea: NSTrackingArea?
+    private var isHovered = false
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let trackingArea { removeTrackingArea(trackingArea) }
+        let area = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseEnteredAndExited, .activeInActiveApp],
+            owner: self
+        )
+        addTrackingArea(area)
+        self.trackingArea = area
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        isHovered = true
+        needsDisplay = true
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        isHovered = false
+        needsDisplay = true
+    }
+
     override func drawKnob() {
         let knobRect = rect(for: .knob)
         let color: NSColor
-        if effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua {
+        let isDark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        if isHovered {
+            color = NSColor(white: 0.90, alpha: isDark ? 0.85 : 0.70)
+        } else if isDark {
             color = NSColor(white: 0.50, alpha: 0.70)
         } else {
             color = NSColor(white: 0.45, alpha: 0.55)
