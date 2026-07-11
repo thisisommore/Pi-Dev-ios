@@ -120,7 +120,7 @@ struct AIModelOption: Identifiable, Hashable, Sendable {
     var symbol: String
 
     static let catalog: [AIModelOption] = [
-        .init(id: "pi-5.6-xhigh", name: "5.6 Terra Extra High", subtitle: "Best quality", symbol: "sparkles"),
+        .init(id: "pi-5.6-xhigh", name: "5.6 Terra", subtitle: "Best quality", symbol: "sparkles"),
         .init(id: "pi-5.6", name: "5.6 Terra", subtitle: "Balanced", symbol: "bolt.fill"),
         .init(id: "pi-haiku", name: "Haiku 4.5 Extended", subtitle: "Fast replies", symbol: "hare.fill"),
         .init(id: "pi-code", name: "Pi Code", subtitle: "Optimized for coding", symbol: "curlybraces")
