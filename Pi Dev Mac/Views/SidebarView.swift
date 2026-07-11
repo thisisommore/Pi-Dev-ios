@@ -79,7 +79,7 @@ struct SidebarView: View {
                             }
                         } header: {
                             projectHeader(group.project)
-                                .padding(.leading, 13)
+                                .padding(.leading, 8)
                                 .padding(.trailing, 0)
                                 .padding(.top, 10)
                                 .padding(.bottom, 4)
