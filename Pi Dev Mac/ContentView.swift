@@ -12,6 +12,7 @@ struct ContentView: View {
     @State private var dragStartWidth: CGFloat = 280
     @State private var isResizing = false
     @State private var isSidebarVisible = true
+    @Environment(\.colorScheme) private var colorScheme
 
     private let sidebarMin: CGFloat = 220
     private let sidebarMax: CGFloat = 360
@@ -54,7 +55,7 @@ struct ContentView: View {
 
     private var resizeHandle: some View {
         Rectangle()
-            .fill(Color(white: 0.9))
+            .fill(Color(white: colorScheme == .dark ? 0.20 : 0.86))
             .frame(width: 1)
             .frame(maxHeight: .infinity)
             .ignoresSafeArea()
