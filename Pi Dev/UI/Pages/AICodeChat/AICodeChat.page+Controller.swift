@@ -505,7 +505,8 @@ final class ChatStore: Identifiable {
               kind: toolKind(for: call.name),
               name: call.name,
               detail: detail,
-              symbol: toolSymbol(for: call.name)
+              symbol: toolSymbol(for: call.name),
+              callId: call.id
             )
             $0.tools.append(tool)
             $0.segments.append(.tool(tool))
@@ -523,7 +524,18 @@ final class ChatStore: Identifiable {
           let command = result.details?["command"]?.value as? String ?? ""
           let exitCode = (result.details?["exitCode"]?.value as? Int) ?? (isError ? 1 : 0)
           updateMessage(at: currentIndex) {
-            $0.terminal.append(TerminalRun(command: command, output: result.textOutput, exitCode: exitCode))
+            let run = TerminalRun(command: command, output: result.textOutput, exitCode: exitCode)
+            $0.terminal.append(run)
+            // Insert the output right after its own command chip, wherever
+            // that chip is — executions may finish in any order.
+            if let chipIndex = $0.segments.lastIndex(where: { segment in
+              guard case .tool(let tool) = segment else { return false }
+              return tool.callId == toolCallId
+            }) {
+              $0.segments.insert(.terminal(run), at: chipIndex + 1)
+            } else {
+              $0.segments.append(.terminal(run))
+            }
           }
         }
 
@@ -647,7 +659,7 @@ final class ChatStore: Identifiable {
         }
       case .toolCall(let call):
         let detail = formatToolDetail(name: call.name, arguments: call.arguments)
-        segments.append(.tool(ToolUse(kind: toolKind(for: call.name), name: call.name, detail: detail, symbol: toolSymbol(for: call.name))))
+        segments.append(.tool(ToolUse(kind: toolKind(for: call.name), name: call.name, detail: detail, symbol: toolSymbol(for: call.name), callId: call.id)))
       case .thinking, .unknown:
         break
       }

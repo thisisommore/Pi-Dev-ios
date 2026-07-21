@@ -13,11 +13,13 @@ struct ChatMessage: Identifiable {
   enum Segment: Identifiable {
     case text(id: UUID = UUID(), text: String)
     case tool(ToolUse)
+    case terminal(TerminalRun)
 
     var id: UUID {
       switch self {
       case .text(let id, _): return id
       case .tool(let tool): return tool.id
+      case .terminal(let run): return run.id
       }
     }
   }

@@ -47,7 +47,7 @@ struct ToolChip: View {
                 ? .system(size: 12, design: .monospaced)
                 : .caption)
           .foregroundStyle(.primary.opacity(0.75))
-          .lineLimit(isCommand ? 6 : 3)
+          .lineLimit(3)
           .multilineTextAlignment(.leading)
           .fixedSize(horizontal: false, vertical: true)
           .frame(maxWidth: .infinity, alignment: .leading)

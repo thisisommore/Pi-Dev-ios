@@ -66,12 +66,17 @@ struct AssistantMessage: View {
               .textSelection(.enabled)
           case .tool(let tool):
             ToolChip(tool: tool)
+          case .terminal(let run):
+            TerminalBlock(run: run)
           }
         }
       } else {
         if !message.tools.isEmpty {
           ToolRow(tools: message.tools)
             .padding(.top, message.thinking != nil ? 2 : 0)
+        }
+        ForEach(message.terminal) { run in
+          TerminalBlock(run: run)
         }
 
         Text(attributedText)
