@@ -10,7 +10,7 @@ struct AssistantMessage: View {
   @Bindable var store: ChatStore
 
   private var hasContent: Bool {
-    !message.text.isEmpty || message.thinking != nil || !message.tools.isEmpty
+    !message.text.isEmpty || message.thinking != nil || !message.tools.isEmpty || message.error != nil
   }
 
   private var attributedText: AttributedString {
@@ -39,6 +39,10 @@ struct AssistantMessage: View {
         .lineSpacing(3)
         .textSelection(.enabled)
 
+      if let error = message.error {
+        ErrorBlock(error: error)
+      }
+
       if let code = message.code {
         CodeBlock(language: code.language, source: code.source)
       }
@@ -56,6 +60,26 @@ struct AssistantMessage: View {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(.horizontal, 2)
+  }
+}
+
+private struct ErrorBlock: View {
+  let error: String
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 8) {
+      Image(systemName: "exclamationmark.triangle.fill")
+        .font(.caption)
+      Text(error)
+        .font(.callout)
+        .lineSpacing(3)
+        .textSelection(.enabled)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    .foregroundStyle(.red)
+    .padding(10)
+    .background(Color.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+    .padding(.top, 4)
   }
 }
 

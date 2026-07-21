@@ -181,6 +181,10 @@ final class ChatStore: Identifiable {
       message.tokens = usage.totalTokens ?? ((usage.input ?? 0) + (usage.output ?? 0))
     }
 
+    if let errorMessage = agentMessage.errorMessage, !errorMessage.isEmpty {
+      message.error = errorMessage
+    }
+
     if let thinkingText = agentMessage.content?.thinkingBlocks().joined(separator: "\n\n"), !thinkingText.isEmpty {
       message.thinking = Thinking(summary: thinkingText, truncated: thinkingText, full: thinkingText, seconds: 0)
     }
@@ -473,6 +477,8 @@ final class ChatStore: Identifiable {
             )
           }
           if let id = call.id { latestToolNames[id] = call.name }
+        case .error(let reason):
+          updateMessage(at: messageIndex) { $0.error = reason }
         default:
           break
         }
@@ -513,9 +519,7 @@ final class ChatStore: Identifiable {
 
       case .extensionError(_, _, let error):
         updateMessage(at: messageIndex) {
-          if $0.text.isEmpty {
-            $0.text = "⚠️ \(error)"
-          }
+          $0.error = error
         }
 
       default:
@@ -560,11 +564,15 @@ final class ChatStore: Identifiable {
     let (textWithoutCode, code) = stripFirstCodeBlock(from: assistantText)
 
     let tokenCount = message.usage?.totalTokens ?? ((message.usage?.input ?? 0) + (message.usage?.output ?? 0))
+    let errorText = message.errorMessage?.isEmpty == false ? message.errorMessage : nil
     updateMessage(at: index) { message in
       message.text = textWithoutCode.trimmingCharacters(in: .whitespacesAndNewlines)
       message.code = code
       message.isStreaming = false
       message.tokens = tokenCount
+      if let errorText {
+        message.error = errorText
+      }
     }
     self.usedTokens += tokenCount
   }

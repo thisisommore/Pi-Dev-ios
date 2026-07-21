@@ -109,6 +109,7 @@ struct AgentMessage: Decodable, Sendable {
   let toolCallId: String?
   let toolName: String?
   let isError: Bool?
+  var errorMessage: String? = nil
 
   enum MessageContent: Decodable, Sendable {
     case text(String)

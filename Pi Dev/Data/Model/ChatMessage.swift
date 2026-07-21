@@ -18,4 +18,5 @@ struct ChatMessage: Identifiable {
   var terminal: [TerminalRun] = []
   var tokens: Int = 0
   var isStreaming: Bool = false
+  var error: String? = nil
 }
