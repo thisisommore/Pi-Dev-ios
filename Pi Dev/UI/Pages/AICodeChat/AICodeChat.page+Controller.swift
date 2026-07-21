@@ -195,9 +195,15 @@ final class ChatStore: Identifiable {
       return ToolUse(kind: toolKind(for: call.name), name: call.name, detail: detail, symbol: toolSymbol(for: call.name))
     }
 
-    let (textWithoutCode, code) = stripFirstCodeBlock(from: message.text)
-    message.code = code
-    message.text = textWithoutCode.trimmingCharacters(in: .whitespacesAndNewlines)
+    if let built = buildSegments(from: agentMessage.content) {
+      message.segments = built.segments
+      message.text = built.text
+      message.code = built.code
+    } else {
+      let (textWithoutCode, code) = stripFirstCodeBlock(from: message.text)
+      message.code = code
+      message.text = textWithoutCode.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
   }
 
   func newChat() {
@@ -414,11 +420,13 @@ final class ChatStore: Identifiable {
   private func consumeStreamEvents(_ events: AsyncStream<AgentEvent>, at messageIndex: Int) async {
     var latestToolNames: [String: String] = [:]
     var thinkingStartTime: Date?
+    var currentIndex = messageIndex
+    var finalizedCurrentTurn = false
 
     func updateThinkingSeconds() {
       guard let start = thinkingStartTime else { return }
       let elapsed = Date().timeIntervalSince(start)
-      updateMessage(at: messageIndex) {
+      updateMessage(at: currentIndex) {
         if $0.thinking == nil {
           $0.thinking = Thinking(summary: "", truncated: "", full: "", seconds: 0)
         }
@@ -429,32 +437,58 @@ final class ChatStore: Identifiable {
     print("[ChatStore] entering event loop")
     for await event in events {
       print("[ChatStore] received event: \(event.debugName)")
-      guard self.messages.indices.contains(messageIndex) else {
-        print("[ChatStore] message index \(messageIndex) out of range, breaking")
+      guard self.messages.indices.contains(currentIndex) else {
+        print("[ChatStore] message index \(currentIndex) out of range, breaking")
         break
       }
 
       switch event {
       case .agentStart:
-        updateMessage(at: messageIndex) { $0.isStreaming = true }
+        updateMessage(at: currentIndex) { $0.isStreaming = true }
 
-      case .messageStart:
-        updateMessage(at: messageIndex) { $0.isStreaming = true }
+      case .messageStart(let message):
+        if message.role == "assistant" {
+          // Each agent turn gets its own assistant message, mirroring how
+          // history loading maps one ChatMessage per assistant entry.
+          let current = self.messages[currentIndex]
+          let hasContent = !current.text.isEmpty || current.thinking != nil || !current.tools.isEmpty || current.error != nil
+          if hasContent {
+            updateMessage(at: currentIndex) { $0.isStreaming = false }
+            withAnimation(.snappy) {
+              self.messages.append(ChatMessage(role: .assistant, text: "", tokens: 0, isStreaming: true))
+            }
+            currentIndex = self.messages.count - 1
+          } else {
+            updateMessage(at: currentIndex) { $0.isStreaming = true }
+          }
+          thinkingStartTime = nil
+          finalizedCurrentTurn = false
+        } else {
+          updateMessage(at: currentIndex) { $0.isStreaming = true }
+        }
 
       case .messageUpdate(_, let delta):
         switch delta {
         case .textDelta(_, let text):
           print("[ChatStore] textDelta: '\(text.prefix(80))'")
-          updateMessage(at: messageIndex) { $0.text += text }
+          updateMessage(at: currentIndex) {
+            $0.text += text
+            if let lastIndex = $0.segments.indices.last,
+               case .text(let segmentId, let existing) = $0.segments[lastIndex] {
+              $0.segments[lastIndex] = .text(id: segmentId, text: existing + text)
+            } else {
+              $0.segments.append(.text(text: text))
+            }
+          }
         case .thinkingStart:
           thinkingStartTime = Date()
-          updateMessage(at: messageIndex) {
+          updateMessage(at: currentIndex) {
             if $0.thinking == nil {
               $0.thinking = Thinking(summary: "", truncated: "", full: "", seconds: 0)
             }
           }
         case .thinkingDelta(_, let text):
-          updateMessage(at: messageIndex) {
+          updateMessage(at: currentIndex) {
             if $0.thinking == nil {
               $0.thinking = Thinking(summary: "", truncated: "", full: "", seconds: 0)
             }
@@ -466,19 +500,19 @@ final class ChatStore: Identifiable {
           updateThinkingSeconds()
         case .toolCallEnd(_, let call):
           let detail = formatToolDetail(name: call.name, arguments: call.arguments)
-          updateMessage(at: messageIndex) {
-            $0.tools.append(
-              ToolUse(
-                kind: toolKind(for: call.name),
-                name: call.name,
-                detail: detail,
-                symbol: toolSymbol(for: call.name)
-              )
+          updateMessage(at: currentIndex) {
+            let tool = ToolUse(
+              kind: toolKind(for: call.name),
+              name: call.name,
+              detail: detail,
+              symbol: toolSymbol(for: call.name)
             )
+            $0.tools.append(tool)
+            $0.segments.append(.tool(tool))
           }
           if let id = call.id { latestToolNames[id] = call.name }
         case .error(let reason):
-          updateMessage(at: messageIndex) { $0.error = reason }
+          updateMessage(at: currentIndex) { $0.error = reason }
         default:
           break
         }
@@ -488,7 +522,7 @@ final class ChatStore: Identifiable {
         if name == "bash" {
           let command = result.details?["command"]?.value as? String ?? ""
           let exitCode = (result.details?["exitCode"]?.value as? Int) ?? (isError ? 1 : 0)
-          updateMessage(at: messageIndex) {
+          updateMessage(at: currentIndex) {
             $0.terminal.append(TerminalRun(command: command, output: result.textOutput, exitCode: exitCode))
           }
         }
@@ -497,20 +531,21 @@ final class ChatStore: Identifiable {
         print("[ChatStore] messageEnd")
         updateThinkingSeconds()
         if message.role == "assistant" {
-          finalize(message: message, at: messageIndex)
+          finalize(message: message, at: currentIndex)
+          finalizedCurrentTurn = true
         }
 
       case .agentEnd(let messages):
         print("[ChatStore] agentEnd messages.count=\(messages.count)")
         updateThinkingSeconds()
-        if let last = messages.last(where: { $0.role == "assistant" }) {
-          finalize(message: last, at: messageIndex)
+        if !finalizedCurrentTurn, let last = messages.last(where: { $0.role == "assistant" }) {
+          finalize(message: last, at: currentIndex)
         } else {
-          updateMessage(at: messageIndex) { $0.isStreaming = false }
+          updateMessage(at: currentIndex) { $0.isStreaming = false }
         }
 
       case .autoRetryStart(let attempt, _, _, let errorMessage):
-        updateMessage(at: messageIndex) {
+        updateMessage(at: currentIndex) {
           if $0.thinking == nil {
             $0.thinking = Thinking(summary: "", truncated: "", full: "", seconds: 0)
           }
@@ -518,7 +553,7 @@ final class ChatStore: Identifiable {
         }
 
       case .extensionError(_, _, let error):
-        updateMessage(at: messageIndex) {
+        updateMessage(at: currentIndex) {
           $0.error = error
         }
 
@@ -529,15 +564,15 @@ final class ChatStore: Identifiable {
 
     print("[ChatStore] event loop ended")
     self.generatingMessageId = nil
-    guard self.messages.indices.contains(messageIndex) else {
-      print("[ChatStore] final check: index \(messageIndex) out of range")
+    guard self.messages.indices.contains(currentIndex) else {
+      print("[ChatStore] final check: index \(currentIndex) out of range")
       return
     }
-    if self.messages[messageIndex].isStreaming {
+    if self.messages[currentIndex].isStreaming {
       print("[ChatStore] forcing isStreaming=false at end")
-      updateMessage(at: messageIndex) { $0.isStreaming = false }
+      updateMessage(at: currentIndex) { $0.isStreaming = false }
     }
-    print("[ChatStore] final message text='\(self.messages[messageIndex].text.prefix(80))' streaming=\(self.messages[messageIndex].isStreaming)")
+    print("[ChatStore] final message text='\(self.messages[currentIndex].text.prefix(80))' streaming=\(self.messages[currentIndex].isStreaming)")
     processQueue()
   }
 
@@ -560,14 +595,16 @@ final class ChatStore: Identifiable {
   private func finalize(message: AgentMessage, at index: Int) {
     guard self.messages.indices.contains(index) else { return }
 
-    let assistantText = message.content?.textBlocks().joined(separator: "\n\n") ?? self.messages[index].text
-    let (textWithoutCode, code) = stripFirstCodeBlock(from: assistantText)
+    let built = buildSegments(from: message.content)
 
     let tokenCount = message.usage?.totalTokens ?? ((message.usage?.input ?? 0) + (message.usage?.output ?? 0))
     let errorText = message.errorMessage?.isEmpty == false ? message.errorMessage : nil
     updateMessage(at: index) { message in
-      message.text = textWithoutCode.trimmingCharacters(in: .whitespacesAndNewlines)
-      message.code = code
+      if let built {
+        message.segments = built.segments
+        message.text = built.text
+        message.code = built.code
+      }
       message.isStreaming = false
       message.tokens = tokenCount
       if let errorText {
@@ -575,6 +612,53 @@ final class ChatStore: Identifiable {
       }
     }
     self.usedTokens += tokenCount
+  }
+
+  /// Builds ordered render segments from message content blocks, extracting the
+  /// first fenced code block into a dedicated code view. Returns nil when the
+  /// content is missing, so callers keep whatever was accumulated while streaming.
+  private func buildSegments(from content: AgentMessage.MessageContent?) -> (segments: [ChatMessage.Segment], text: String, code: (language: String, source: String)?)? {
+    guard let content else { return nil }
+
+    let blocks: [AgentMessage.ContentBlock]
+    switch content {
+    case .text(let string):
+      blocks = [.text(string)]
+    case .blocks(let contentBlocks):
+      blocks = contentBlocks
+    }
+
+    var segments: [ChatMessage.Segment] = []
+    var code: (language: String, source: String)? = nil
+    for block in blocks {
+      switch block {
+      case .text(let rawText):
+        var text = rawText
+        if code == nil {
+          let (stripped, found) = stripFirstCodeBlock(from: text)
+          if let found {
+            code = found
+            text = stripped
+          }
+        }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+          segments.append(.text(text: trimmed))
+        }
+      case .toolCall(let call):
+        let detail = formatToolDetail(name: call.name, arguments: call.arguments)
+        segments.append(.tool(ToolUse(kind: toolKind(for: call.name), name: call.name, detail: detail, symbol: toolSymbol(for: call.name))))
+      case .thinking, .unknown:
+        break
+      }
+    }
+
+    let text = segments.compactMap { segment -> String? in
+      guard case .text(_, let text) = segment else { return nil }
+      return text
+    }.joined(separator: "\n\n")
+
+    return (segments, text, code)
   }
 
   private func stripFirstCodeBlock(from text: String) -> (text: String, code: (language: String, source: String)?) {

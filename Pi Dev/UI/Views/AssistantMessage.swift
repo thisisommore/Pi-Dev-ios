@@ -14,10 +14,37 @@ struct AssistantMessage: View {
   }
 
   private var attributedText: AttributedString {
-    (try? AttributedString(
-      markdown: message.text,
-      options: AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-    )) ?? AttributedString(message.text)
+    markdown(message.text)
+  }
+
+  private func markdown(_ string: String) -> AttributedString {
+    // Parse line by line so raw newlines are preserved exactly. Heading
+    // markers are styled manually because SwiftUI's Text does not render
+    // block-level markdown presentation intents.
+    var result = AttributedString()
+    var insideCodeFence = false
+    for line in string.components(separatedBy: "\n") {
+      if line.hasPrefix("```") {
+        insideCodeFence.toggle()
+      }
+      var lineText = line
+      var headingLevel = 0
+      if !insideCodeFence,
+         let match = line.range(of: #"^(#{1,6})\s+"#, options: .regularExpression) {
+        headingLevel = line[match].count(where: { $0 == "#" })
+        lineText = String(line[match.upperBound...])
+      }
+      var parsed = (try? AttributedString(
+        markdown: lineText,
+        options: AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+      )) ?? AttributedString(lineText)
+      if headingLevel > 0 {
+        parsed.font = headingLevel <= 2 ? Font.title3.bold() : Font.headline
+      }
+      result.append(parsed)
+      result.append(AttributedString("\n"))
+    }
+    return result
   }
 
   var body: some View {
@@ -29,15 +56,29 @@ struct AssistantMessage: View {
       if let thinking = message.thinking {
         ThinkingBlock(thinking: thinking)
       }
-      if !message.tools.isEmpty {
-        ToolRow(tools: message.tools)
-          .padding(.top, message.thinking != nil ? 2 : 0)
-      }
+      if !message.segments.isEmpty {
+        ForEach(message.segments) { segment in
+          switch segment {
+          case .text(_, let text):
+            Text(markdown(text))
+              .font(.callout)
+              .lineSpacing(3)
+              .textSelection(.enabled)
+          case .tool(let tool):
+            ToolChip(tool: tool)
+          }
+        }
+      } else {
+        if !message.tools.isEmpty {
+          ToolRow(tools: message.tools)
+            .padding(.top, message.thinking != nil ? 2 : 0)
+        }
 
-      Text(attributedText)
-        .font(.callout)
-        .lineSpacing(3)
-        .textSelection(.enabled)
+        Text(attributedText)
+          .font(.callout)
+          .lineSpacing(3)
+          .textSelection(.enabled)
+      }
 
       if let error = message.error {
         ErrorBlock(error: error)
