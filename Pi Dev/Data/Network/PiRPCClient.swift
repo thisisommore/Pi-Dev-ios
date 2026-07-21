@@ -479,6 +479,7 @@ struct SessionInfo: Identifiable, Decodable, Sendable {
   let path: String
   let id: String
   let cwd: String
+  let name: String?
   let created: String
   let modified: String
   let messageCount: Int

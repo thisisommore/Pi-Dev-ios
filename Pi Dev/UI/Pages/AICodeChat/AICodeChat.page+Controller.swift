@@ -123,6 +123,9 @@ final class ChatStore: Identifiable {
     if let levelString = state.thinkingLevel {
       self.thinkingLevel = ThinkingLevel(id: levelString)
     }
+    if let name = state.sessionName?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
+      self.chatTitle = name
+    }
     self.supportedThinkingLevels = self.buildSupportedThinkingLevels(from: state.model?.thinkingLevelMap)
   }
 
@@ -585,6 +588,13 @@ final class ChatStore: Identifiable {
       updateMessage(at: currentIndex) { $0.isStreaming = false }
     }
     print("[ChatStore] final message text='\(self.messages[currentIndex].text.prefix(80))' streaming=\(self.messages[currentIndex].isStreaming)")
+    await syncStateFromServer()
+    // The server generates the session title asynchronously after a run;
+    // refresh once more shortly after to pick it up.
+    Task { @MainActor [weak self] in
+      try? await Task.sleep(for: .seconds(10))
+      await self?.syncStateFromServer()
+    }
     processQueue()
   }
 
@@ -778,6 +788,9 @@ final class SidebarStore {
   }
 
   func sessionTitle(_ session: SessionInfo) -> String {
+    if let name = session.name?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
+      return name
+    }
     let text = session.firstMessage ?? "New chat"
     return String(text.prefix(34))
   }
