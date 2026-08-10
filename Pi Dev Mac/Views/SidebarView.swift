@@ -231,7 +231,7 @@ private struct ScrollViewStyleConfigurator: NSViewRepresentable {
             scrollView.scrollerStyle = .overlay
             scrollView.automaticallyAdjustsContentInsets = false
             scrollView.contentInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
-            scrollView.scrollerInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: -4)
+            scrollView.scrollerInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: -40)
             if !(scrollView.verticalScroller is SidebarScroller) {
                 let scroller = SidebarScroller()
                 scroller.controlSize = .small
