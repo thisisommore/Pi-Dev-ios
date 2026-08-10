@@ -112,6 +112,9 @@ struct SidebarView: View {
         .contentMargins(.trailing, hasScrollbar ? 0 : 2, for: .scrollContent)
         .scrollContentBackground(.hidden)
         .background(Color.clear)
+        .onChange(of: hasScrollbar) { old, new in
+            print("[Sidebar] hasScrollbar \(old) -> \(new) (contentHeight \(store.filteredSessions.count) sessions)")
+        }
     }
 
     /// Project / folder section header with a new-chat control on the trailing edge.
@@ -240,7 +243,9 @@ private struct ScrollViewStyleConfigurator: NSViewRepresentable {
             // Update scrollbar existence for dynamic contentMargins — use contentSize vs bounds, not isHidden (overlay is hidden until hover)
             let hasBar = scrollView.hasVerticalScroller
                 && scrollView.contentSize.height > scrollView.bounds.height + 1
+            print("[Sidebar] updateNSView hasBar=\(hasBar) hasScrollbar=\(hasScrollbar) contentSize=\(scrollView.contentSize.height) bounds=\(scrollView.bounds.height) hasVScroller=\(scrollView.hasVerticalScroller) scrollerHidden=\(scrollView.verticalScroller?.isHidden ?? true)")
             if hasBar != hasScrollbar {
+                print("[Sidebar] -> toggling hasScrollbar to \(hasBar)")
                 DispatchQueue.main.async {
                     hasScrollbar = hasBar
                 }
@@ -286,7 +291,9 @@ private struct ScrollViewStyleConfigurator: NSViewRepresentable {
             guard let scrollView, let hasScrollbar else { return }
             let hasBar = scrollView.hasVerticalScroller
                 && scrollView.contentSize.height > scrollView.bounds.height + 1
+            print("[Sidebar] Coordinator update hasBar=\(hasBar) current=\(hasScrollbar.wrappedValue) contentSize=\(scrollView.contentSize.height) bounds=\(scrollView.bounds.height)")
             if hasBar != hasScrollbar.wrappedValue {
+                print("[Sidebar] Coordinator -> toggling to \(hasBar)")
                 DispatchQueue.main.async {
                     hasScrollbar.wrappedValue = hasBar
                 }
