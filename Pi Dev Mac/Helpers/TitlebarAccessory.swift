@@ -49,14 +49,14 @@ private struct TitlebarChangesButton: View {
 
     var body: some View {
         Button {
-            store.isChangesSidebarVisible.toggle()
+            // Play action
         } label: {
-            Image(systemName: "sidebar.right")
-                .font(.system(size: 14, weight: .medium))
+            Image(systemName: "play.fill")
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.primary)
         }
         .buttonStyle(.plain)
-        .help(store.isChangesSidebarVisible ? "Hide changes" : "Show changes")
+        .help("Play")
         .frame(width: 28, height: 28)
         .contentShape(Rectangle())
         .padding(.trailing, 8)
