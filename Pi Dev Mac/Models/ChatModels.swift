@@ -185,8 +185,8 @@ struct PromptSuggestion: Identifiable, Hashable, Sendable {
     }
 
     static let emptyState: [PromptSuggestion] = [
-        .init(title: "Explore and understand code", symbol: "magnifyingglass", tint: .blue),
-        .init(title: "Build a new feature, app, or tool", symbol: "hammer.fill", tint: .purple),
-        .init(title: "Review code and suggest changes", symbol: "checkmark.seal.fill", tint: .green)
+        .init(title: "Explore and understand code", symbol: "magnifyingglass", tint: .secondary),
+        .init(title: "Build a new feature, app, or tool", symbol: "hammer.fill", tint: .secondary),
+        .init(title: "Review code and suggest changes", symbol: "checkmark.seal.fill", tint: .secondary)
     ]
 }

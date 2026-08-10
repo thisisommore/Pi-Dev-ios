@@ -15,11 +15,11 @@ struct EmptyStateView: View {
 
             ZStack {
                 Circle()
-                    .fill(Color.primary.opacity(0.04))
-                    .frame(width: 72, height: 72)
+                    .fill(Color.primary.opacity(0.025))
+                    .frame(width: 64, height: 64)
                 Image(systemName: "chevron.left.forwardslash.chevron.right")
-                    .font(.system(size: 28, weight: .light))
-                    .foregroundStyle(.tertiary)
+                    .font(.system(size: 24, weight: .light))
+                    .foregroundStyle(.secondary)
             }
 
             VStack(spacing: 8) {
@@ -60,8 +60,8 @@ struct EmptyStateView: View {
                 } label: {
                     VStack(alignment: .leading, spacing: 14) {
                         Image(systemName: suggestion.symbol)
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(suggestion.tint)
+                            .font(.system(size: 14, weight: .regular))
+                            .foregroundStyle(.secondary)
                         Text(suggestion.title)
                             .font(.callout.weight(.medium))
                             .foregroundStyle(.primary)
@@ -72,11 +72,11 @@ struct EmptyStateView: View {
                     .padding(16)
                     .background {
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(Color.primary.opacity(0.03))
+                            .fill(Color.primary.opacity(0.02))
                     }
                     .overlay {
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+                            .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
                     }
                 }
                 .buttonStyle(.plain)
