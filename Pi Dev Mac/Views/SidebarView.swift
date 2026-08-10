@@ -198,9 +198,6 @@ struct SidebarView: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text("Om More")
                     .font(.caption.weight(.semibold))
-                Text("Local · Free")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
             }
 
             Spacer()

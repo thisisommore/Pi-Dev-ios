@@ -43,10 +43,7 @@ struct ComposerView: View {
                 }
 
             HStack(spacing: 8) {
-                modelPicker
-                thinkingLevelPicker
                 Spacer(minLength: 0)
-                attachButton
                 sendButton
             }
         }
@@ -63,85 +60,6 @@ struct ComposerView: View {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
         }
-    }
-
-    private var attachButton: some View {
-        Menu {
-            Button("Attach file…") {}
-            Button("Add folder…") {}
-        } label: {
-            Image(systemName: "plus")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .frame(width: 28, height: 28)
-                .contentShape(Rectangle())
-        }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .help("Add context")
-    }
-
-    private var modelPicker: some View {
-        Menu {
-            ForEach(AIModelOption.catalog) { model in
-                Button {
-                    store.selectedModel = model
-                } label: {
-                    Label {
-                        VStack(alignment: .leading) {
-                            Text(model.name)
-                            Text(model.subtitle)
-                                .font(.caption)
-                        }
-                    } icon: {
-                        Image(systemName: model.symbol)
-                    }
-                }
-            }
-        } label: {
-            Text(store.selectedModel.name)
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .contentShape(Rectangle())
-        }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .help("Model")
-    }
-
-    private var thinkingLevelPicker: some View {
-        Menu {
-            ForEach(ThinkingLevel.all) { level in
-                Button {
-                    store.selectedThinkingLevel = level
-                } label: {
-                    Label {
-                        VStack(alignment: .leading) {
-                            Text(level.displayName)
-                            Text(level.subtitle)
-                                .font(.caption)
-                        }
-                    } icon: {
-                        Image(systemName: level.symbol)
-                    }
-                }
-            }
-        } label: {
-            Text(store.selectedThinkingLevel.displayName)
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .contentShape(Rectangle())
-        }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .help("Thinking level")
     }
 
     private var sendButton: some View {
