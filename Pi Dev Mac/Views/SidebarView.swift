@@ -108,6 +108,7 @@ struct SidebarView: View {
             .padding(.bottom, 8)
             .background(ScrollViewStyleConfigurator())
         }
+        .contentMargins(.trailing, -2, for: .scrollContent)
         .scrollContentBackground(.hidden)
         .background(Color.clear)
     }
