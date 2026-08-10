@@ -109,7 +109,7 @@ struct SidebarView: View {
             .padding(.bottom, 8)
             .background(ScrollViewStyleConfigurator(hasScrollbar: $hasScrollbar))
         }
-        .contentMargins(.trailing, hasScrollbar ? -16 : 0, for: .scrollContent)
+        .contentMargins(.trailing, hasScrollbar ? -200 : 0, for: .scrollContent)
         .scrollContentBackground(.hidden)
         .background(Color.clear)
     }
@@ -237,9 +237,8 @@ private struct ScrollViewStyleConfigurator: NSViewRepresentable {
                 scroller.controlSize = .small
                 scrollView.verticalScroller = scroller
             }
-            // Update scrollbar existence for dynamic contentMargins
-            let hasBar = !(scrollView.verticalScroller?.isHidden ?? true)
-                && scrollView.hasVerticalScroller
+            // Update scrollbar existence for dynamic contentMargins — use contentSize vs bounds, not isHidden (overlay is hidden until hover)
+            let hasBar = scrollView.hasVerticalScroller
                 && scrollView.contentSize.height > scrollView.bounds.height + 1
             if hasBar != hasScrollbar {
                 DispatchQueue.main.async {
@@ -285,8 +284,7 @@ private struct ScrollViewStyleConfigurator: NSViewRepresentable {
 
         private func update() {
             guard let scrollView, let hasScrollbar else { return }
-            let hasBar = !(scrollView.verticalScroller?.isHidden ?? true)
-                && scrollView.hasVerticalScroller
+            let hasBar = scrollView.hasVerticalScroller
                 && scrollView.contentSize.height > scrollView.bounds.height + 1
             if hasBar != hasScrollbar.wrappedValue {
                 DispatchQueue.main.async {
