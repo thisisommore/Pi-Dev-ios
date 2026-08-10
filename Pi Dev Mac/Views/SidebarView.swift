@@ -60,7 +60,7 @@ struct SidebarView: View {
     // MARK: - List
 
     /// Outer gap before the selection background (right of the row pill).
-    private let rowOuterTrailing: CGFloat = 4
+    private let rowOuterTrailing: CGFloat = 0
     /// Outer gap on the left — +1 so it visually matches the right side.
     private let rowOuterLeading: CGFloat = 4
     /// Inner text padding inside the selection background.
@@ -108,6 +108,7 @@ struct SidebarView: View {
             .padding(.bottom, 8)
             .background(ScrollViewStyleConfigurator())
         }
+        .contentMargins(.trailing, 4, for: .scrollContent)
         .scrollContentBackground(.hidden)
         .background(Color.clear)
     }
