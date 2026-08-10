@@ -8,6 +8,7 @@ import SwiftUI
 
 struct SidebarView: View {
     @Bindable var store: ChatStore
+    @State private var hasScrollbar = false
 
     /// Subtle gray selection (not system accent blue).
     private var selectionFill: Color {
@@ -106,9 +107,9 @@ struct SidebarView: View {
             .padding(.leading, rowOuterLeading)
             .padding(.trailing, rowOuterTrailing)
             .padding(.bottom, 8)
-            .background(ScrollViewStyleConfigurator())
+            .background(ScrollViewStyleConfigurator(hasScrollbar: $hasScrollbar))
         }
-        .contentMargins(.trailing, -2, for: .scrollContent)
+        .contentMargins(.trailing, hasScrollbar ? -4 : 0, for: .scrollContent)
         .scrollContentBackground(.hidden)
         .background(Color.clear)
     }
@@ -216,6 +217,8 @@ struct SidebarView: View {
 
 /// Configures the backing `NSScrollView` to use a thin, dark overlay scroller.
 private struct ScrollViewStyleConfigurator: NSViewRepresentable {
+    @Binding var hasScrollbar: Bool
+
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
         view.isHidden = true
@@ -234,6 +237,66 @@ private struct ScrollViewStyleConfigurator: NSViewRepresentable {
                 scroller.controlSize = .small
                 scrollView.verticalScroller = scroller
             }
+            // Update scrollbar existence for dynamic contentMargins
+            let hasBar = !(scrollView.verticalScroller?.isHidden ?? true)
+                && scrollView.hasVerticalScroller
+                && scrollView.contentSize.height > scrollView.bounds.height + 1
+            if hasBar != hasScrollbar {
+                DispatchQueue.main.async {
+                    hasScrollbar = hasBar
+                }
+            }
+            // Observe future changes
+            if context.coordinator.scrollView == nil {
+                context.coordinator.scrollView = scrollView
+                context.coordinator.hasScrollbar = $hasScrollbar
+                scrollView.postsBoundsChangedNotifications = true
+                NotificationCenter.default.addObserver(
+                    context.coordinator,
+                    selector: #selector(Coordinator.boundsDidChange(_:)),
+                    name: NSView.boundsDidChangeNotification,
+                    object: scrollView.contentView
+                )
+                NotificationCenter.default.addObserver(
+                    context.coordinator,
+                    selector: #selector(Coordinator.scrollerDidChange(_:)),
+                    name: NSScrollView.didLiveScrollNotification,
+                    object: scrollView
+                )
+            }
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    final class Coordinator: NSObject {
+        weak var scrollView: NSScrollView?
+        var hasScrollbar: Binding<Bool>?
+
+        @objc func boundsDidChange(_ note: Notification) {
+            update()
+        }
+
+        @objc func scrollerDidChange(_ note: Notification) {
+            update()
+        }
+
+        private func update() {
+            guard let scrollView, let hasScrollbar else { return }
+            let hasBar = !(scrollView.verticalScroller?.isHidden ?? true)
+                && scrollView.hasVerticalScroller
+                && scrollView.contentSize.height > scrollView.bounds.height + 1
+            if hasBar != hasScrollbar.wrappedValue {
+                DispatchQueue.main.async {
+                    hasScrollbar.wrappedValue = hasBar
+                }
+            }
+        }
+
+        deinit {
+            NotificationCenter.default.removeObserver(self)
         }
     }
 }
