@@ -53,7 +53,7 @@ private struct TitlebarChangesButton: View {
         } label: {
             Image(systemName: "play.fill")
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.primary)
+                .foregroundStyle(.secondary)
         }
         .buttonStyle(.plain)
         .help("Play")
