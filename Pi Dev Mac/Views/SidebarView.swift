@@ -240,10 +240,11 @@ private struct ScrollViewStyleConfigurator: NSViewRepresentable {
                 scroller.controlSize = .small
                 scrollView.verticalScroller = scroller
             }
-            // Update scrollbar existence for dynamic contentMargins — use contentSize vs bounds, not isHidden (overlay is hidden until hover)
-            let hasBar = scrollView.hasVerticalScroller
-                && scrollView.contentSize.height > scrollView.bounds.height + 1
-            print("[Sidebar] updateNSView hasBar=\(hasBar) hasScrollbar=\(hasScrollbar) contentSize=\(scrollView.contentSize.height) bounds=\(scrollView.bounds.height) hasVScroller=\(scrollView.hasVerticalScroller) scrollerHidden=\(scrollView.verticalScroller?.isHidden ?? true)")
+            // Update scrollbar existence for dynamic contentMargins — check documentView vs clipView, not scrollView.bounds (which equals contentSize in SwiftUI)
+            let docH = scrollView.documentView?.frame.height ?? scrollView.contentSize.height
+            let clipH = scrollView.contentView.bounds.height
+            let hasBar = scrollView.hasVerticalScroller && docH > clipH + 1
+            print("[Sidebar] updateNSView hasBar=\(hasBar) hasScrollbar=\(hasScrollbar) docH=\(docH) clipH=\(clipH) contentSize=\(scrollView.contentSize.height) bounds=\(scrollView.bounds.height) hasVScroller=\(scrollView.hasVerticalScroller) scrollerHidden=\(scrollView.verticalScroller?.isHidden ?? true) docFrame=\(String(describing: scrollView.documentView?.frame))")
             if hasBar != hasScrollbar {
                 print("[Sidebar] -> toggling hasScrollbar to \(hasBar)")
                 DispatchQueue.main.async {
@@ -289,9 +290,10 @@ private struct ScrollViewStyleConfigurator: NSViewRepresentable {
 
         private func update() {
             guard let scrollView, let hasScrollbar else { return }
-            let hasBar = scrollView.hasVerticalScroller
-                && scrollView.contentSize.height > scrollView.bounds.height + 1
-            print("[Sidebar] Coordinator update hasBar=\(hasBar) current=\(hasScrollbar.wrappedValue) contentSize=\(scrollView.contentSize.height) bounds=\(scrollView.bounds.height)")
+            let docH = scrollView.documentView?.frame.height ?? scrollView.contentSize.height
+            let clipH = scrollView.contentView.bounds.height
+            let hasBar = scrollView.hasVerticalScroller && docH > clipH + 1
+            print("[Sidebar] Coordinator update hasBar=\(hasBar) current=\(hasScrollbar.wrappedValue) docH=\(docH) clipH=\(clipH) contentSize=\(scrollView.contentSize.height) bounds=\(scrollView.bounds.height) docFrame=\(String(describing: scrollView.documentView?.frame))")
             if hasBar != hasScrollbar.wrappedValue {
                 print("[Sidebar] Coordinator -> toggling to \(hasBar)")
                 DispatchQueue.main.async {
