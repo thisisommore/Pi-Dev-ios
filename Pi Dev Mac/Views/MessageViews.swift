@@ -103,7 +103,7 @@ struct AssistantMessageView: View {
 
     private var messageActions: some View {
         HStack(spacing: 14) {
-            ForEach(["doc.on.doc", "hand.thumbsup", "hand.thumbsdown", "arrow.triangle.2.circlepath"], id: \.self) { symbol in
+            ForEach(["doc.on.doc", "arrow.triangle.2.circlepath"], id: \.self) { symbol in
                 Button {} label: {
                     Image(systemName: symbol)
                         .font(.system(size: 12, weight: .medium))
