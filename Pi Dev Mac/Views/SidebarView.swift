@@ -60,7 +60,7 @@ struct SidebarView: View {
     // MARK: - List
 
     /// Outer gap before the selection background (right of the row pill).
-    private let rowOuterTrailing: CGFloat = 0
+    private let rowOuterTrailing: CGFloat = 8
     /// Outer gap on the left — +1 so it visually matches the right side.
     private let rowOuterLeading: CGFloat = 4
     /// Inner text padding inside the selection background.
@@ -108,7 +108,6 @@ struct SidebarView: View {
             .padding(.bottom, 8)
             .background(ScrollViewStyleConfigurator())
         }
-        .contentMargins(.trailing, -8, for: .scrollContent)
         .scrollContentBackground(.hidden)
         .background(Color.clear)
     }
@@ -228,7 +227,7 @@ private struct ScrollViewStyleConfigurator: NSViewRepresentable {
             scrollView.scrollerStyle = .overlay
             scrollView.automaticallyAdjustsContentInsets = false
             scrollView.contentInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
-            scrollView.scrollerInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: -4)
+            scrollView.scrollerInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
             if !(scrollView.verticalScroller is SidebarScroller) {
                 let scroller = SidebarScroller()
                 scroller.controlSize = .small
