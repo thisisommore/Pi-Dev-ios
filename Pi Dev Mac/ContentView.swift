@@ -78,7 +78,7 @@ struct ContentView: View {
             maxWidth: sidebarMax,
             lineWhite: colorScheme == .dark ? 0.20 : 0.86
         )
-        .frame(width: 8)
+        .frame(width: 0)
         .frame(maxHeight: .infinity)
         .ignoresSafeArea()
         .zIndex(1)
