@@ -109,7 +109,7 @@ struct SidebarView: View {
             .padding(.bottom, 8)
             .background(ScrollViewStyleConfigurator(hasScrollbar: $hasScrollbar))
         }
-        .contentMargins(.trailing, 0, for: .scrollContent)
+        .contentMargins(.trailing, hasScrollbar ? 0 : 1, for: .scrollContent)
         .scrollContentBackground(.hidden)
         .background(Color.clear)
     }
@@ -231,7 +231,7 @@ private struct ScrollViewStyleConfigurator: NSViewRepresentable {
             scrollView.scrollerStyle = .overlay
             scrollView.automaticallyAdjustsContentInsets = false
             scrollView.contentInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
-            scrollView.scrollerInsets = NSEdgeInsets(top: 0, left: -10, bottom: 0, right: 0)
+            scrollView.scrollerInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
             if !(scrollView.verticalScroller is SidebarScroller) {
                 let scroller = SidebarScroller()
                 scroller.controlSize = .small
