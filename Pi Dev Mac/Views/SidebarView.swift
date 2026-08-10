@@ -112,9 +112,6 @@ struct SidebarView: View {
         .contentMargins(.trailing, hasScrollbar ? 0 : 2, for: .scrollContent)
         .scrollContentBackground(.hidden)
         .background(Color.clear)
-        .onChange(of: hasScrollbar) { old, new in
-            print("[Sidebar] hasScrollbar \(old) -> \(new) (contentHeight \(store.filteredSessions.count) sessions)")
-        }
     }
 
     /// Project / folder section header with a new-chat control on the trailing edge.
@@ -229,6 +226,9 @@ private struct ScrollViewStyleConfigurator: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
+        // Refresh every pass — a binding captured from an earlier render goes stale after state changes.
+        context.coordinator.hasScrollbar = $hasScrollbar
+        context.coordinator.lastKnown = hasScrollbar
         DispatchQueue.main.async {
             guard let scrollView = nsView.firstAncestor(ofType: NSScrollView.self) else { return }
             scrollView.scrollerStyle = .overlay
@@ -244,9 +244,7 @@ private struct ScrollViewStyleConfigurator: NSViewRepresentable {
             let docH = scrollView.documentView?.frame.height ?? scrollView.contentSize.height
             let clipH = scrollView.contentView.bounds.height
             let hasBar = scrollView.hasVerticalScroller && docH > clipH + 1
-            print("[Sidebar] updateNSView hasBar=\(hasBar) hasScrollbar=\(hasScrollbar) docH=\(docH) clipH=\(clipH) contentSize=\(scrollView.contentSize.height) bounds=\(scrollView.bounds.height) hasVScroller=\(scrollView.hasVerticalScroller) scrollerHidden=\(scrollView.verticalScroller?.isHidden ?? true) docFrame=\(String(describing: scrollView.documentView?.frame))")
             if hasBar != hasScrollbar {
-                print("[Sidebar] -> toggling hasScrollbar to \(hasBar)")
                 DispatchQueue.main.async {
                     hasScrollbar = hasBar
                 }
@@ -254,14 +252,24 @@ private struct ScrollViewStyleConfigurator: NSViewRepresentable {
             // Observe future changes
             if context.coordinator.scrollView == nil {
                 context.coordinator.scrollView = scrollView
-                context.coordinator.hasScrollbar = $hasScrollbar
-                scrollView.postsBoundsChangedNotifications = true
+                // Clip view posts its own bounds changes (resize/scroll)
+                scrollView.contentView.postsBoundsChangedNotifications = true
                 NotificationCenter.default.addObserver(
                     context.coordinator,
                     selector: #selector(Coordinator.boundsDidChange(_:)),
                     name: NSView.boundsDidChangeNotification,
                     object: scrollView.contentView
                 )
+                // Document frame changes are what actually add/remove the scrollbar
+                if let documentView = scrollView.documentView {
+                    documentView.postsFrameChangedNotifications = true
+                    NotificationCenter.default.addObserver(
+                        context.coordinator,
+                        selector: #selector(Coordinator.boundsDidChange(_:)),
+                        name: NSView.frameDidChangeNotification,
+                        object: documentView
+                    )
+                }
                 NotificationCenter.default.addObserver(
                     context.coordinator,
                     selector: #selector(Coordinator.scrollerDidChange(_:)),
@@ -279,6 +287,8 @@ private struct ScrollViewStyleConfigurator: NSViewRepresentable {
     final class Coordinator: NSObject {
         weak var scrollView: NSScrollView?
         var hasScrollbar: Binding<Bool>?
+        /// Last value we observed/wrote — the stored binding can read stale, so don't trust it for comparisons.
+        var lastKnown = false
 
         @objc func boundsDidChange(_ note: Notification) {
             update()
@@ -289,15 +299,14 @@ private struct ScrollViewStyleConfigurator: NSViewRepresentable {
         }
 
         private func update() {
-            guard let scrollView, let hasScrollbar else { return }
+            guard let scrollView else { return }
             let docH = scrollView.documentView?.frame.height ?? scrollView.contentSize.height
             let clipH = scrollView.contentView.bounds.height
             let hasBar = scrollView.hasVerticalScroller && docH > clipH + 1
-            print("[Sidebar] Coordinator update hasBar=\(hasBar) current=\(hasScrollbar.wrappedValue) docH=\(docH) clipH=\(clipH) contentSize=\(scrollView.contentSize.height) bounds=\(scrollView.bounds.height) docFrame=\(String(describing: scrollView.documentView?.frame))")
-            if hasBar != hasScrollbar.wrappedValue {
-                print("[Sidebar] Coordinator -> toggling to \(hasBar)")
-                DispatchQueue.main.async {
-                    hasScrollbar.wrappedValue = hasBar
+            if hasBar != lastKnown {
+                lastKnown = hasBar
+                DispatchQueue.main.async { [weak self] in
+                    self?.hasScrollbar?.wrappedValue = hasBar
                 }
             }
         }
