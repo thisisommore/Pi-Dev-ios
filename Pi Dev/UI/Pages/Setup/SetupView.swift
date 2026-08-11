@@ -13,6 +13,7 @@ struct SetupView: View {
   @State private var tokenDraft = ""
   @State private var isChecking = false
   @State private var errorMessage: String?
+  @State private var showHelp = false
   @FocusState private var focusedField: Field?
 
   private enum Field: Hashable {
@@ -38,7 +39,8 @@ struct SetupView: View {
     ZStack {
       Background()
 
-      VStack(spacing: 28) {
+      ScrollView(showsIndicators: false) {
+        VStack(spacing: 28) {
         Spacer()
 
         VStack(spacing: 12) {
@@ -125,9 +127,57 @@ struct SetupView: View {
         }
         .padding(.horizontal, 32)
 
-        Spacer()
+        // Help: set password (pi-backend)
+        VStack(spacing: 12) {
+          Button {
+            withAnimation(.snappy) { showHelp.toggle() }
+          } label: {
+            HStack(spacing: 6) {
+              Image(systemName: "questionmark.circle")
+                .font(.caption.weight(.semibold))
+              Text("Where to get server info?")
+                .font(.caption.weight(.semibold))
+              Image(systemName: showHelp ? "chevron.up" : "chevron.down")
+                .font(.system(size: 10, weight: .bold))
+            }
+            .foregroundStyle(.secondary)
+            .padding(.vertical, 6)
+            .padding(.horizontal, 12)
+            .background(.ultraThinMaterial, in: .capsule)
+          }
+          .buttonStyle(.plain)
+
+          if showHelp {
+            VStack(alignment: .leading, spacing: 12) {
+              Label("Set a password with PI_API_TOKEN", systemImage: "key.fill")
+                .font(.caption.weight(.semibold))
+              Text("Use the same value as Authentication token above.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+              codeBlock("PI_API_TOKEN=super-secret npx pi-rpc-server@latest")
+
+              Divider().opacity(0.4)
+
+              Link(destination: URL(string: "https://github.com/thisisommore/pi-backend#readme")!) {
+                Label("github.com/thisisommore/pi-backend", systemImage: "arrow.up.right.square")
+                  .font(.caption)
+              }
+            }
+            .padding(14)
+            .background(.ultraThinMaterial, in: .rect(cornerRadius: 16))
+            .overlay(
+              RoundedRectangle(cornerRadius: 16)
+                .stroke(.secondary.opacity(0.2), lineWidth: 0.5)
+            )
+            .transition(.opacity.combined(with: .move(edge: .top)))
+          }
+        }
+        .padding(.horizontal, 32)
+
+          Spacer(minLength: 20)
+        }
+        .padding(.vertical, 40)
       }
-      .padding(.vertical, 40)
     }
     .onAppear {
       urlDraft = serverURL
@@ -159,6 +209,37 @@ struct SetupView: View {
     .overlay(
       RoundedRectangle(cornerRadius: 16)
         .stroke(.secondary.opacity(0.25), lineWidth: 0.5)
+    )
+  }
+
+  @ViewBuilder
+  private func codeBlock(_ text: String, compact: Bool = false) -> some View {
+    HStack(spacing: 8) {
+      Text(text)
+        .font(.system(compact ? .caption2 : .caption, design: .monospaced))
+        .foregroundStyle(.primary)
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
+        .truncationMode(.middle)
+      Spacer(minLength: 8)
+      Button {
+        #if canImport(UIKit)
+          UIPasteboard.general.string = text
+        #endif
+      } label: {
+        Image(systemName: "doc.on.doc")
+          .font(.system(size: compact ? 11 : 12, weight: .medium))
+          .foregroundStyle(.secondary)
+      }
+      .buttonStyle(.plain)
+      .accessibilityLabel("Copy \(text)")
+    }
+    .padding(.horizontal, 10)
+    .padding(.vertical, compact ? 6 : 8)
+    .background(Color.primary.opacity(0.08), in: .rect(cornerRadius: 8))
+    .overlay(
+      RoundedRectangle(cornerRadius: 8)
+        .stroke(.secondary.opacity(0.15), lineWidth: 0.5)
     )
   }
 
