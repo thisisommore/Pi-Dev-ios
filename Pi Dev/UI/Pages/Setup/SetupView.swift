@@ -149,12 +149,26 @@ struct SetupView: View {
 
           if showHelp {
             VStack(alignment: .leading, spacing: 12) {
-              Label("Set a password with PI_API_TOKEN", systemImage: "key.fill")
-                .font(.caption.weight(.semibold))
-              Text("Use the same value as Authentication token above.")
+              Text("Run your Pi server, then use its URL and token here.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-              codeBlock("PI_API_TOKEN=super-secret npx pi-rpc-server@latest")
+
+              VStack(alignment: .leading, spacing: 6) {
+                Label("1. Start the server with a password and port", systemImage: "key.fill")
+                  .font(.caption.weight(.semibold))
+                codeBlock("PI_API_TOKEN=super-secret PORT=3000 npx pi-rpc-server@latest")
+                Text("Pick any strong password and free port. This starts the server on http://localhost:3000.")
+                  .font(.caption2)
+                  .foregroundStyle(.secondary)
+              }
+
+              VStack(alignment: .leading, spacing: 6) {
+                Label("2. Tunnel that port and connect", systemImage: "link")
+                  .font(.caption.weight(.semibold))
+                Text("Expose your localhost with any tunnel, then paste the public URL into Server URL and the same PI_API_TOKEN into Authentication token.")
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+              }
 
               Divider().opacity(0.4)
 
