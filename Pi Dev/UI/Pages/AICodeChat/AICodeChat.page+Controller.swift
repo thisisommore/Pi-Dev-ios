@@ -978,22 +978,14 @@ final class ChatStore: Identifiable {
       updateMessage(at: currentIndex) { $0.isStreaming = false }
     }
     await syncStateFromServer()
-    // First turn of a new chat: server now has a sessionId — adopt it so
-    // sidebar shows the new chat immediately without requiring reload.
+    // First turn of a new chat: adopt server session so sidebar updates.
+    // Only adopt if we were previously unselected (new chat draft).
     if expectedSessionId == nil {
       do {
         let state = try await rpcClient.getState()
         if let newId = state.data?.sessionId, !newId.isEmpty {
-          let shouldAdopt: Bool = await MainActor.run {
-            if self.cacheSessionId == nil {
-              self.cacheSessionId = newId
-              return true
-            }
-            return false
-          }
-          if shouldAdopt {
-            await MainActor.run { self.onNewSessionAdopted?(newId) }
-          }
+          // Don't set cache here — let SidebarStore adopt atomically via loadSessions
+          await MainActor.run { self.onNewSessionAdopted?(newId) }
         }
       } catch {}
     }
@@ -1213,15 +1205,27 @@ final class SidebarStore {
   /// unselected new chat, then refresh the sidebar list.
   private func adoptNewChatSession(_ sessionId: String) async {
     guard !sessionId.isEmpty else { return }
-    // If already selected (e.g. user switched during stream), ignore.
     if let selected = selectedSessionId, selected == sessionId { return }
     // Only adopt when we were in the "New chat" (unselected) state.
+    // If user already switched to another session during the stream, ignore.
     guard selectedSessionId == nil else { return }
+    // Set selection first so draft preview hides and real entry highlights.
     selectedSessionId = sessionId
     activeChat.cacheSessionId = sessionId
     persistPrefs()
+    // Refresh list; retry briefly if server hasn't yet listed the new session.
     await loadSessions()
-    // Ensure the new chat is cached under the correct id.
+    if !sessions.contains(where: { $0.id == sessionId }) {
+      // Server may need a moment to flush the session file after first prompt.
+      try? await Task.sleep(for: .milliseconds(600))
+      await loadSessions()
+    }
+    // Re-assert selection even if list still doesn't contain it (avoid clearing).
+    if selectedSessionId != sessionId {
+      selectedSessionId = sessionId
+      activeChat.cacheSessionId = sessionId
+      persistPrefs()
+    }
     activeChat.persistChatCache(sessionId: sessionId)
   }
 
@@ -1430,8 +1434,32 @@ final class SidebarStore {
 
     do {
       _ = try await rpcClient.newSession()
+      // Try to select the newly created session immediately so the first
+      // prompt is guaranteed to route to the new session even if user
+      // taps Send quickly. This also makes the empty "New chat" appear
+      // in the sidebar right away (avoids "send to previous session" race).
+      do {
+        let state = try await rpcClient.getState()
+        if let newId = state.data?.sessionId, !newId.isEmpty {
+          await MainActor.run {
+            selectedSessionId = newId
+            activeChat.cacheSessionId = newId
+            persistPrefs()
+          }
+          await loadSessions()
+          // Keep selection even if list hasn't yet included the new file.
+          if selectedSessionId != newId {
+            await MainActor.run {
+              selectedSessionId = newId
+              activeChat.cacheSessionId = newId
+              persistPrefs()
+            }
+          }
+          return
+        }
+      } catch {}
       await loadSessions()
-      // Stay unselected while composing; server already switched to the new session.
+      // Fallback: stay unselected while composing; server already switched.
       await MainActor.run {
         selectedSessionId = nil
         activeChat.cacheSessionId = nil
