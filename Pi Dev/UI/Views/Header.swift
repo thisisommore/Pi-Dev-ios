@@ -26,7 +26,7 @@ struct Header: View {
           }
           dismissKeyboard()
         } label: {
-          Image(systemName: "line.2.horizontal")
+          Image(systemName: "equal")
             .font(.system(size: 17, weight: .semibold))
             .foregroundStyle(appIcon)
             .frame(width: 44, height: 44)
