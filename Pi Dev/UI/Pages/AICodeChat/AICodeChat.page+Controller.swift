@@ -307,6 +307,10 @@ final class ChatStore: Identifiable {
       let state = try await rpcClient.getState()
       await MainActor.run {
         // No animation — state sync runs on refresh and after streams.
+        // Guard against stale state (user switched sessions while fetching).
+        if let stateData = state.data, let sid = stateData.sessionId, let cached = self.cacheSessionId, sid != cached {
+          return
+        }
         if let stateData = state.data {
           self.apply(state: stateData)
         }
@@ -320,6 +324,8 @@ final class ChatStore: Identifiable {
   /// On failure, existing (cached) messages are left untouched.
   /// - Parameter sessionId: When set, persists the loaded transcript under this session.
   func loadMessages(sessionId: String? = nil) async {
+    // Capture target at call time to detect stale completions after a session switch.
+    let targetId = sessionId ?? cacheSessionId
     do {
       let response = try await rpcClient.getEntries()
       guard let entries = response.data?.entries else { return }
@@ -342,6 +348,11 @@ final class ChatStore: Identifiable {
       let state = try await rpcClient.getState()
       let tokens = chatMessages.reduce(0) { $0 + $1.tokens }
       await MainActor.run {
+        // Discard stale results if user switched sessions while we were fetching.
+        if let targetId, self.cacheSessionId != targetId { return }
+        // Also discard if server state belongs to a different session.
+        if let sid = state.data?.sessionId, let cached = self.cacheSessionId, sid != cached { return }
+
         // Background revalidate: only replace when content actually differs.
         // Avoids ForEach re-insert animations from fresh UUIDs on every load.
         if !ChatMessage.contentMatches(self.messages, chatMessages) {
@@ -354,7 +365,10 @@ final class ChatStore: Identifiable {
           self.apply(state: stateData)
         }
         if let sessionId {
-          self.persistChatCache(sessionId: sessionId)
+          // Only persist if still the active session.
+          if self.cacheSessionId == sessionId {
+            self.persistChatCache(sessionId: sessionId)
+          }
         }
       }
     } catch {
@@ -1124,6 +1138,14 @@ final class SidebarStore {
       // Instant paint from cache when available.
       if let cached = PiCache.loadChat(sessionId: session.id) {
         activeChat.applyCachedSnapshot(cached)
+        // Ensure title matches the selected session even if cache is stale.
+        // applyCachedSnapshot uses the cached title, but sessionTitle is authoritative
+        // when server renames sessions (name/firstMessage). Keep cached if it was a
+        // user-edited title? For now prefer sessionTitle when it differs from "New chat".
+        let authoritative = sessionTitle(session)
+        if authoritative != "New chat", activeChat.chatTitle == "New chat" || activeChat.chatTitle.isEmpty {
+          activeChat.chatTitle = authoritative
+        }
       } else {
         // No cache — clear to the new title while network loads.
         activeChat.messages = []
@@ -1140,7 +1162,10 @@ final class SidebarStore {
     }
 
     do {
+      // Abort early if user switched again while we were painting.
+      guard selectedSessionId == session.id else { return }
       _ = try await rpcClient.switchSession(path: session.path)
+      guard selectedSessionId == session.id, activeChat.cacheSessionId == session.id else { return }
       await activeChat.loadMessages(sessionId: session.id)
       persistPrefs()
     } catch {
@@ -1204,6 +1229,7 @@ final class SidebarStore {
   ///   Launch refresh uses `false` so cached messages stay visible until RPC returns.
   private func syncActiveSession(clearBeforeLoad: Bool = true) async {
     guard let session = sessions.first(where: { $0.id == selectedSessionId }) else { return }
+    let expectedId = session.id
     activeChat.cacheSessionId = session.id
     if clearBeforeLoad {
       await activeChat.resetToSession(title: sessionTitle(session))
@@ -1211,10 +1237,12 @@ final class SidebarStore {
       activeChat.chatTitle = sessionTitle(session)
     }
     do {
+      guard selectedSessionId == expectedId else { return }
       _ = try await rpcClient.switchSession(path: session.path)
     } catch {
       // Still attempt get_entries; switch may not be required if already active.
     }
+    guard selectedSessionId == expectedId, activeChat.cacheSessionId == expectedId else { return }
     await activeChat.loadMessages(sessionId: session.id)
   }
 }
