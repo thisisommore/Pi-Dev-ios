@@ -30,6 +30,9 @@ final class ChatStore: Identifiable {
   /// Called when the first turn of a new (previously unselected) chat commits on the server.
   /// SidebarStore sets this to adopt the new sessionId and refresh the list.
   var onNewSessionAdopted: ((String) -> Void)?
+  /// Called after any prompt stream completes to refresh sidebar via RPC.
+  /// SidebarStore sets this to trigger loadSessions() on the main actor.
+  var onStreamCompleted: (() async -> Void)?
 
   private let rpcClient = PiRPCClient()
 
@@ -989,6 +992,11 @@ final class ChatStore: Identifiable {
         }
       } catch {}
     }
+    // Always refresh sidebar via RPC after a prompt so the new chat appears
+    // even when newChat had already selected the empty session (title update).
+    if let onStreamCompleted {
+      await onStreamCompleted()
+    }
     // Only persist if still the same session.
     if let expectedSessionId, self.cacheSessionId != expectedSessionId { return }
     persistChatCache()
@@ -1194,11 +1202,22 @@ final class SidebarStore {
         await self?.adoptNewChatSession(newId)
       }
     }
+    activeChat.onStreamCompleted = { [weak self] in
+      await self?.refreshSessionsAfterPrompt()
+    }
     guard connectToServer else { return }
     hydrateFromCache()
     Task { @MainActor in
       await refreshFromServer()
     }
+  }
+
+  /// Refresh sidebar via RPC after any prompt completes. Ensures a just-created
+  /// new chat (even when already selected as empty) appears with its updated
+  /// title/firstMessage without requiring app reload or another newChat.
+  private func refreshSessionsAfterPrompt() async {
+    // Don't block the chat UI — loadSessions is already MainActor and lightweight.
+    await loadSessions()
   }
 
   /// Adopt the server-assigned sessionId for the first turn of a previously
@@ -1498,6 +1517,9 @@ final class SidebarStore {
       Task { @MainActor in
         await self?.adoptNewChatSession(newId)
       }
+    }
+    activeChat.onStreamCompleted = { [weak self] in
+      await self?.refreshSessionsAfterPrompt()
     }
     PiCache.clearAll()
   }
