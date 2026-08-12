@@ -4,9 +4,9 @@ Mobile client for the **π coding agent** — chat with your codebase, run tools
 
 **Pi Dev Mobile is live on the App Store:**
 
-**[→ Download Pi Dev Mobile on the App Store](https://apps.apple.com/in/app/pi-dev-mobile/id6789149807)**
+**[→ Download Pi Dev Mobile on the App Store](https://apps.apple.com/app/pi-dev-mobile/id6789149807)**
 
-> https://apps.apple.com/in/app/pi-dev-mobile/id6789149807
+> https://apps.apple.com/app/pi-dev-mobile/id6789149807
 
 ---
 
