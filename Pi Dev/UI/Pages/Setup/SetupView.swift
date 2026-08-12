@@ -45,8 +45,8 @@ struct SetupView: View {
 
         VStack(spacing: 12) {
           Text("π")
-            .font(.system(size: 56, weight: .thin, design: .serif))
-            .foregroundStyle(appColor)
+            .font(.system(size: 56, weight: .light, design: .serif))
+            .foregroundStyle(appGradient)
 
           Text("Welcome to Pi Dev")
             .font(.title.weight(.semibold))
@@ -105,7 +105,7 @@ struct SetupView: View {
             .padding(.vertical, 16)
             .background(
               canContinue
-                ? AnyShapeStyle(appColor.gradient)
+                ? AnyShapeStyle(appGradient)
                 : AnyShapeStyle(.gray.opacity(0.4)),
               in: .rect(cornerRadius: 20)
             )

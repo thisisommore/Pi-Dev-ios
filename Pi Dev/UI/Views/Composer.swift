@@ -232,7 +232,7 @@ struct Composer: View {
           .font(.system(size: 15, weight: .bold))
           .frame(width: 40, height: 40)
           .foregroundStyle(.white)
-          .background(AnyShapeStyle(appColor.gradient),
+          .background(AnyShapeStyle(appGradient),
             in: .circle
           )
       }

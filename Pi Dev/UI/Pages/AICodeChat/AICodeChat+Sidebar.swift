@@ -15,7 +15,7 @@ struct Sidebar: View {
       Color(.systemBackground)
         .ignoresSafeArea()
       LinearGradient(
-        colors: [appColor.opacity(0.08), .clear, .teal.opacity(0.06)],
+        colors: [appColor.opacity(0.07), .clear, appAccentSecondary.opacity(0.05)],
         startPoint: .topLeading, endPoint: .bottomTrailing
       )
       .ignoresSafeArea()
