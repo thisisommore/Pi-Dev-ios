@@ -18,6 +18,10 @@ struct Composer: View {
   @Environment(\.colorScheme) private var colorScheme
 
   private var hasAttachments: Bool { !store.pastedItems.isEmpty || !store.contextFiles.isEmpty }
+  private var canSendMessage: Bool {
+    !(store.draft.isEmpty && store.pastedItems.isEmpty && store.contextFiles.isEmpty)
+  }
+
   var body: some View {
     GlassEffectContainer(spacing: 10) {
       mainContent
@@ -231,14 +235,15 @@ struct Composer: View {
         Image(systemName: "arrow.up")
           .font(.system(size: 15, weight: .bold))
           .frame(width: 40, height: 40)
-          .foregroundStyle(.white)
-          .background(AnyShapeStyle(appGradient),
+          .foregroundStyle(canSendMessage ? AnyShapeStyle(appOnInk) : AnyShapeStyle(.secondary))
+          .background(
+            canSendMessage ? AnyShapeStyle(appColor) : AnyShapeStyle(Color.primary.opacity(0.12)),
             in: .circle
           )
       }
       .buttonStyle(.plain)
-      .disabled(store.draft.isEmpty && store.pastedItems.isEmpty && store.contextFiles.isEmpty)
-      .animation(.snappy, value: store.draft.isEmpty && store.pastedItems.isEmpty && store.contextFiles.isEmpty)
+      .disabled(!canSendMessage)
+      .animation(.snappy, value: canSendMessage)
     }
     .frame(maxWidth: .infinity)
     .padding(.vertical, 6)

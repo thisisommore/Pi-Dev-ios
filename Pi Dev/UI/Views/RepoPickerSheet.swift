@@ -134,7 +134,7 @@ struct RepoPickerSheet: View {
           if let errorMessage {
             Text(errorMessage)
               .font(.caption)
-              .foregroundStyle(.red)
+              .foregroundStyle(.secondary)
           }
 
           ForEach(githubRepos) { repo in

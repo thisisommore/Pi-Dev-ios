@@ -10,25 +10,24 @@ struct Background: View {
     ZStack {
       Color(.systemBackground)
 
-      // Soft diagonal wash — indigo top-left, violet bottom-right.
+      // Barely-there monochrome wash (pi.dev is mostly flat canvas).
       LinearGradient(
         colors: [
-          appColor.opacity(0.10),
+          Color.primary.opacity(0.04),
           .clear,
-          appAccentSecondary.opacity(0.09),
+          Color.primary.opacity(0.03),
         ],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
       )
 
-      // Ambient glows (kept low so the field stays clean, not washed-out).
       Circle()
-        .fill(appColor.opacity(0.16))
+        .fill(Color.primary.opacity(0.04))
         .frame(width: 360)
         .blur(radius: 100)
         .offset(x: -130, y: -260)
       Circle()
-        .fill(appAccentSecondary.opacity(0.12))
+        .fill(Color.primary.opacity(0.03))
         .frame(width: 300)
         .blur(radius: 90)
         .offset(x: 140, y: 300)

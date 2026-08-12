@@ -114,8 +114,8 @@ struct DiffLabel: View {
   }
 
   private func color(for part: String) -> Color {
-    if part.hasPrefix("+") { return .green }
-    if part.hasPrefix("−") || part.hasPrefix("-") { return .red }
-    return .secondary
+    if part.hasPrefix("+") { return .primary }
+    if part.hasPrefix("−") || part.hasPrefix("-") { return .secondary }
+    return .secondary.opacity(0.6)
   }
 }

@@ -24,7 +24,7 @@ struct UserBubble: View {
         .font(.callout)
         .padding(.horizontal, 16)
         .padding(.vertical, 11)
-        .foregroundStyle(.white)
+        .foregroundStyle(appOnInk)
         .background(
           appColor,
           in: .rect(cornerRadius: 22)

@@ -52,7 +52,7 @@ struct TerminalBlock: View {
 
           Image(systemName: succeeded ? "checkmark.circle.fill" : "xmark.circle.fill")
             .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(succeeded ? .green : .red)
+            .foregroundStyle(succeeded ? .primary : .secondary)
             .padding(.top, 1)
 
           Image(systemName: "chevron.down")
@@ -96,7 +96,7 @@ struct TerminalBlock: View {
             Text("exit \(run.exitCode)")
               .font(.system(size: 10, weight: .semibold, design: .monospaced))
           }
-          .foregroundStyle(.red.opacity(0.9))
+          .foregroundStyle(.secondary)
           .padding(.horizontal, 12)
           .padding(.bottom, 10)
         }

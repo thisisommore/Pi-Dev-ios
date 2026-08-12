@@ -122,9 +122,9 @@ private struct ErrorBlock: View {
         .textSelection(.enabled)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .foregroundStyle(.red)
+    .foregroundStyle(.primary)
     .padding(10)
-    .background(Color.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+    .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
     .padding(.top, 4)
   }
 }

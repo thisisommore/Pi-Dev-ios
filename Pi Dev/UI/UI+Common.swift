@@ -4,24 +4,30 @@
 //
 
 import SwiftUI
+import UIKit
 
-/// Brand indigo — richer than system blue, reads cleanly on light and dark.
-let appColor = Color(red: 0.40, green: 0.38, blue: 0.95)
+// MARK: - pi.dev monochrome palette
+//
+// From https://pi.dev/style.css:
+//   --pi-logo-color (light): #09090b
+//   --pi-logo-color (dark):  #ffffff
+//   --black / --white plus neutral grays for surfaces
+//
+// App chrome is black / white / gray only.
 
-/// Soft violet used as a secondary ambient accent (backgrounds, glows).
-let appAccentSecondary = Color(red: 0.58, green: 0.42, blue: 0.95)
+/// Ink fill — near-black in light, white in dark (matches pi logo).
+let appColor = Color(uiColor: UIColor { traits in
+  traits.userInterfaceStyle == .dark
+    ? UIColor.white
+    : UIColor(red: 0.035, green: 0.035, blue: 0.043, alpha: 1) // #09090b
+})
 
-/// Logo / CTA gradient: indigo → sky.
-var appGradient: LinearGradient {
-  LinearGradient(
-    colors: [
-      Color(red: 0.45, green: 0.40, blue: 0.98),
-      Color(red: 0.32, green: 0.55, blue: 0.98),
-    ],
-    startPoint: .topLeading,
-    endPoint: .bottomTrailing
-  )
-}
+/// Text / icons painted on solid ink fills.
+let appOnInk = Color(uiColor: UIColor { traits in
+  traits.userInterfaceStyle == .dark
+    ? UIColor(red: 0.035, green: 0.035, blue: 0.043, alpha: 1) // #09090b
+    : UIColor.white
+})
 
 extension Int {
   /// Formats the integer using US-style compact notation (K, M, B, T),

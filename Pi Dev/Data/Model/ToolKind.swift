@@ -18,9 +18,9 @@ enum ToolKind {
 
   var tint: Color {
     switch self {
-    case .mcp:     .blue
-    case .skill:   .pink
-    case .builtin: .green
+    case .mcp:     .primary
+    case .skill:   .primary.opacity(0.65)
+    case .builtin: .secondary
     }
   }
 }

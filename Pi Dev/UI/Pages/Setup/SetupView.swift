@@ -46,7 +46,7 @@ struct SetupView: View {
         VStack(spacing: 12) {
           Text("π")
             .font(.system(size: 56, weight: .light, design: .serif))
-            .foregroundStyle(appGradient)
+            .foregroundStyle(appColor)
 
           Text("Welcome to Pi Dev")
             .font(.title.weight(.semibold))
@@ -90,7 +90,7 @@ struct SetupView: View {
             HStack(spacing: 8) {
               if isChecking {
                 ProgressView()
-                  .tint(.white)
+                  .tint(appOnInk)
                   .scaleEffect(0.8)
               }
               Text(isChecking ? "Checking…" : "Continue")
@@ -100,13 +100,13 @@ struct SetupView: View {
                   .font(.system(size: 14, weight: .semibold))
               }
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(canContinue ? AnyShapeStyle(appOnInk) : AnyShapeStyle(.secondary))
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
             .background(
               canContinue
-                ? AnyShapeStyle(appGradient)
-                : AnyShapeStyle(.gray.opacity(0.4)),
+                ? AnyShapeStyle(appColor)
+                : AnyShapeStyle(Color.primary.opacity(0.12)),
               in: .rect(cornerRadius: 20)
             )
           }
@@ -120,7 +120,7 @@ struct SetupView: View {
               Text(errorMessage)
                 .font(.caption)
             }
-            .foregroundStyle(.orange)
+            .foregroundStyle(.secondary)
             .multilineTextAlignment(.center)
             .padding(.horizontal, 8)
           }
