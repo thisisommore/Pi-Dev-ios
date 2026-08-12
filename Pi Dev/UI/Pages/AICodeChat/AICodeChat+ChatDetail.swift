@@ -11,31 +11,26 @@ struct ChatDetailView: View {
   @Binding var showSidebar: Bool
   var onNewChat: () -> Void = {}
 
-  private func dismissKeyboard() {
-    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-  }
-
   var body: some View {
     ZStack {
       Background()
 
-      ZStack(alignment: .top) {
-        Background()
-
-        MessageList(store: store)
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
-
+      MessageList(
+        store: store,
+        showSidebar: $showSidebar,
+        showModelSheet: $showModelSheet,
+        onNewChat: onNewChat
+      )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+    .overlay(alignment: .top) {
+      if store.messages.isEmpty {
         Header(
           store: store,
           showModelSheet: $showModelSheet,
           showSidebar: $showSidebar,
           onNewChat: onNewChat
         )
-      }
-      .contentShape(.rect)
-      .onTapGesture {
-        store.cancelEditIfUnchanged()
-        dismissKeyboard()
       }
     }
     .safeAreaInset(edge: .bottom, spacing: 0) {

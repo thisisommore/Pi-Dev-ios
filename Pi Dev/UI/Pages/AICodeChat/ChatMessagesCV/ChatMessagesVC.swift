@@ -12,6 +12,24 @@
 import SwiftUI
 import UIKit
 
+/// Collection view is a full-screen UIKit representable. Hit-test the SwiftUI
+/// header (and other non-list subviews) first; pass the header band through
+/// so an overlay header can still receive taps.
+private final class HeaderPassthroughView: UIView {
+  var passthroughHeight: CGFloat = 68
+  override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+    guard isUserInteractionEnabled, !isHidden, alpha > 0.01 else { return nil }
+    for subview in subviews.reversed() where !(subview is UICollectionView) {
+      let converted = subview.convert(point, from: self)
+      if let hit = subview.hitTest(converted, with: event) {
+        return hit
+      }
+    }
+    if point.y < passthroughHeight { return nil }
+    return super.hitTest(point, with: event)
+  }
+}
+
 final class ChatMessagesVC: UIViewController {
   var store: ChatStore
   private var observationTask: Task<Void, Never>?
@@ -24,6 +42,7 @@ final class ChatMessagesVC: UIViewController {
   private var previousViewSize: CGFloat = 0
   private var lastMeasuredWidth: CGFloat = 0
   private var heightCache: [UUID: (signature: Int, height: CGFloat)] = [:]
+  private var headerHost: UIHostingController<Header>?
 
   private lazy var scrollToBottomButton: UIButton = {
     let btn = UIButton(type: .system)
@@ -53,6 +72,12 @@ final class ChatMessagesVC: UIViewController {
 
   @available(*, unavailable)
   required init?(coder _: NSCoder) { fatalError() }
+
+  override func loadView() {
+    let root = HeaderPassthroughView()
+    root.backgroundColor = .clear
+    view = root
+  }
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -118,6 +143,26 @@ final class ChatMessagesVC: UIViewController {
     applySnapshot(animated: false)
   }
 
+  func installHeader(_ header: Header) {
+    if let headerHost {
+      headerHost.rootView = header
+      view.bringSubviewToFront(headerHost.view)
+      return
+    }
+    let host = UIHostingController(rootView: header)
+    host.view.backgroundColor = .clear
+    addChild(host)
+    view.addSubview(host.view)
+    host.view.translatesAutoresizingMaskIntoConstraints = false
+    NSLayoutConstraint.activate([
+      host.view.topAnchor.constraint(equalTo: view.topAnchor),
+      host.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+      host.view.trailingAnchor.constraint(equalTo: view.trailingAnchor)
+    ])
+    host.didMove(toParent: self)
+    headerHost = host
+  }
+
   deinit {
     observationTask?.cancel()
     NotificationCenter.default.removeObserver(self)
@@ -161,6 +206,7 @@ final class ChatMessagesVC: UIViewController {
   }
 
   @objc private func dismissKeyboard() {
+    store.cancelEditIfUnchanged()
     UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
   }
 

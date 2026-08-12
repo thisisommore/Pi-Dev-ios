@@ -7,6 +7,9 @@ import SwiftUI
 
 struct MessageList: View {
   @Bindable var store: ChatStore
+  @Binding var showSidebar: Bool
+  @Binding var showModelSheet: Bool
+  var onNewChat: () -> Void
 
   var body: some View {
     if store.messages.isEmpty {
@@ -16,8 +19,13 @@ struct MessageList: View {
       // ChatMessagesCV (iOS 17.2). Provides interactive keyboard dismiss,
       // preserveBottomOffset, scroll-to-bottom button, and near-bottom tracking.
       if #available(iOS 17.2, *) {
-        ChatMessagesView(store: store)
-          .ignoresSafeArea(.keyboard, edges: .bottom)
+        ChatMessagesView(
+          store: store,
+          showSidebar: $showSidebar,
+          showModelSheet: $showModelSheet,
+          onNewChat: onNewChat
+        )
+        .ignoresSafeArea(.keyboard, edges: .bottom)
       } else {
         // Fallback for older OS — original SwiftUI ScrollView
         ScrollViewFallback(store: store)
