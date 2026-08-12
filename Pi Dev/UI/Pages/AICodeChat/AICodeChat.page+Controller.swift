@@ -36,6 +36,8 @@ final class ChatStore: Identifiable {
 
   var isStreaming: Bool { messages.contains { $0.isStreaming } }
   var generatingMessageId: UUID? = nil
+  var isGenerating: Bool { isResponding || isStreaming }
+  private var stopRequested = false
 
   // Stable UUID per queue entry — avoids ForEach diff glitches when removing by offset.
   private var queuedMessageIDs: [UUID] = []
@@ -558,7 +560,44 @@ final class ChatStore: Identifiable {
     }
   }
 
+  func stopGeneration() {
+    guard isGenerating else { return }
+    stopRequested = true
+    // Immediate UI feedback: halt spinners and mark partial content.
+    isResponding = false
+    for idx in messages.indices where messages[idx].isStreaming {
+      messages[idx].isStreaming = false
+      if messages[idx].error == nil {
+        messages[idx].error = "Generation stopped"
+      }
+    }
+    generatingMessageId = nil
+    rpcClient.cancel()
+    Task { [weak self] in
+      guard let self else { return }
+      do {
+        _ = try await self.rpcClient.abort()
+        print("[ChatStore] abort sent successfully")
+      } catch {
+        print("[ChatStore] abort failed: \(error.localizedDescription)")
+      }
+      await self.syncStateFromServer()
+      await MainActor.run {
+        self.persistChatCache()
+      }
+    }
+  }
+
+  private func isAbortError(_ text: String?) -> Bool {
+    guard let text else { return false }
+    return text.lowercased().contains("abort")
+  }
+
   private func processQueue() {
+    if stopRequested {
+      stopRequested = false
+      return
+    }
     guard !messageQueue.isEmpty, !isResponding, !isStreaming else { return }
     let next = messageQueue.removeFirst()
     if queuedMessageIDs.indices.contains(0) {
@@ -610,6 +649,13 @@ final class ChatStore: Identifiable {
 
 
   private func streamReply(for userText: String, repo: IncludedRepo? = nil) async {
+    if stopRequested {
+      print("[ChatStore] streamReply suppressed due to stopRequested")
+      stopRequested = false
+      isResponding = false
+      generatingMessageId = nil
+      return
+    }
     let streamSessionId = self.cacheSessionId
     let messageIndex = self.messages.count
     print("[ChatStore] streamReply start index=\(messageIndex) session=\(streamSessionId ?? "nil")")
@@ -646,6 +692,13 @@ final class ChatStore: Identifiable {
   }
 
   private func streamRerun(message: String? = nil, entryId: String? = nil, userMessageIndex: Int? = nil) async {
+    if stopRequested {
+      print("[ChatStore] streamRerun suppressed due to stopRequested")
+      stopRequested = false
+      isResponding = false
+      generatingMessageId = nil
+      return
+    }
     let streamSessionId = self.cacheSessionId
     let messageIndex = self.messages.count
     print("[ChatStore] streamRerun start index=\(messageIndex) session=\(streamSessionId ?? "nil")")
@@ -716,6 +769,12 @@ final class ChatStore: Identifiable {
 
       case .messageStart(let message):
         if message.role == "assistant" {
+          // If we manually stopped, the server's follow-up abort turn should be ignored
+          // to avoid a second empty "Request was aborted." message.
+          if stopRequested {
+            print("[ChatStore] ignoring message_start due to manual abort")
+            break
+          }
           // Each agent turn gets its own assistant message, mirroring how
           // history loading maps one ChatMessage per assistant entry.
           let current = self.messages[currentIndex]
@@ -783,6 +842,10 @@ final class ChatStore: Identifiable {
           }
           if let id = call.id { latestToolNames[id] = call.name }
         case .error(let reason):
+          if stopRequested && isAbortError(reason) {
+            print("[ChatStore] ignoring abort error delta due to manual stop")
+            break
+          }
           updateMessage(at: currentIndex) { $0.error = reason }
         default:
           break
@@ -835,6 +898,10 @@ final class ChatStore: Identifiable {
         }
 
       case .extensionError(_, _, let error):
+        if stopRequested && isAbortError(error) {
+          print("[ChatStore] ignoring extension abort error due to manual stop")
+          break
+        }
         updateMessage(at: currentIndex) {
           $0.error = error
         }
@@ -912,7 +979,15 @@ final class ChatStore: Identifiable {
     let built = buildSegments(from: message.content)
 
     let tokenCount = message.usage?.totalTokens ?? ((message.usage?.input ?? 0) + (message.usage?.output ?? 0))
-    let errorText = message.errorMessage?.isEmpty == false ? message.errorMessage : nil
+    let rawErrorText = message.errorMessage?.isEmpty == false ? message.errorMessage : nil
+    let errorText: String? = {
+      guard let rawErrorText else { return nil }
+      if stopRequested && isAbortError(rawErrorText) {
+        print("[ChatStore] ignoring abort error in finalize due to manual stop")
+        return nil
+      }
+      return rawErrorText
+    }()
     updateMessage(at: index) { message in
       if let built {
         message.segments = built.segments

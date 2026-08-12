@@ -369,22 +369,37 @@ struct Composer: View {
       .menuStyle(.borderlessButton)
       .tint(.primary)
 
-      Button {
-        focused = false
-        store.send()
-      } label: {
-        Image(systemName: "arrow.up")
-          .font(.system(size: 15, weight: .bold))
-          .frame(width: 40, height: 40)
-          .foregroundStyle(canSendMessage ? AnyShapeStyle(appOnInk) : AnyShapeStyle(.secondary))
-          .background(
-            canSendMessage ? AnyShapeStyle(appColor) : AnyShapeStyle(Color.primary.opacity(0.12)),
-            in: .circle
-          )
+      if store.isGenerating {
+        Button {
+          store.stopGeneration()
+        } label: {
+          Image(systemName: "stop.fill")
+            .font(.system(size: 13, weight: .bold))
+            .frame(width: 40, height: 40)
+            .foregroundStyle(.white)
+            .background(Color.red, in: .circle)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Stop generation")
+        .transition(.scale.combined(with: .opacity))
+      } else {
+        Button {
+          focused = false
+          store.send()
+        } label: {
+          Image(systemName: "arrow.up")
+            .font(.system(size: 15, weight: .bold))
+            .frame(width: 40, height: 40)
+            .foregroundStyle(canSendMessage ? AnyShapeStyle(appOnInk) : AnyShapeStyle(.secondary))
+            .background(
+              canSendMessage ? AnyShapeStyle(appColor) : AnyShapeStyle(Color.primary.opacity(0.12)),
+              in: .circle
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(!canSendMessage)
+        .animation(.snappy, value: canSendMessage)
       }
-      .buttonStyle(.plain)
-      .disabled(!canSendMessage)
-      .animation(.snappy, value: canSendMessage)
     }
     .frame(maxWidth: .infinity)
     .padding(.vertical, 6)
