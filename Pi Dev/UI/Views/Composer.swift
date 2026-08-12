@@ -377,7 +377,7 @@ struct Composer: View {
             .font(.system(size: 13, weight: .bold))
             .frame(width: 40, height: 40)
             .foregroundStyle(.white)
-            .background(Color.red, in: .circle)
+            .background(Color.black, in: .circle)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Stop generation")
