@@ -1027,6 +1027,15 @@ final class SidebarStore {
         models: bootstrap.models,
         preferredModelId: bootstrap.lastModelId
       )
+      // Enforce authoritative title even when cache is stale (previous race
+      // could have saved Brave's title under Hi's id). Sidebar list is the
+      // source of truth for display name.
+      if let sid = selectedSessionId, let session = sessions.first(where: { $0.id == sid }) {
+        let authoritative = sessionTitle(session)
+        if authoritative != "New chat", !authoritative.isEmpty {
+          activeChat.chatTitle = authoritative
+        }
+      }
     } else if let session = sessions.first(where: { $0.id == selectedSessionId }) {
       activeChat.chatTitle = sessionTitle(session)
     }
@@ -1138,12 +1147,14 @@ final class SidebarStore {
       // Instant paint from cache when available.
       if let cached = PiCache.loadChat(sessionId: session.id) {
         activeChat.applyCachedSnapshot(cached)
-        // Ensure title matches the selected session even if cache is stale.
-        // applyCachedSnapshot uses the cached title, but sessionTitle is authoritative
-        // when server renames sessions (name/firstMessage). Keep cached if it was a
-        // user-edited title? For now prefer sessionTitle when it differs from "New chat".
+        // Authoritative title is from the sessions list (name / firstMessage).
+        // Always enforce it immediately — fixes stale cache where a previous
+        // race saved the old session's title under the new session's id.
+        // Local renames via Header are saved to cache and will be overwritten
+        // here on next select, but server `sessionName` (via get_state) will
+        // restore it after loadMessages if the rename was propagated.
         let authoritative = sessionTitle(session)
-        if authoritative != "New chat", activeChat.chatTitle == "New chat" || activeChat.chatTitle.isEmpty {
+        if authoritative != "New chat", !authoritative.isEmpty {
           activeChat.chatTitle = authoritative
         }
       } else {
@@ -1233,8 +1244,14 @@ final class SidebarStore {
     activeChat.cacheSessionId = session.id
     if clearBeforeLoad {
       await activeChat.resetToSession(title: sessionTitle(session))
-    } else if activeChat.chatTitle == "New chat" || activeChat.chatTitle.isEmpty {
-      activeChat.chatTitle = sessionTitle(session)
+    } else {
+      // Keep cache visible but ensure title matches the active session.
+      // Previously only updated when title was "New chat", which left stale
+      // titles after a race where cache was saved with the previous session's title.
+      let authoritative = sessionTitle(session)
+      if authoritative != "New chat", !authoritative.isEmpty, activeChat.chatTitle != authoritative {
+        activeChat.chatTitle = authoritative
+      }
     }
     do {
       guard selectedSessionId == expectedId else { return }
