@@ -31,18 +31,45 @@ private final class HeaderPassthroughView: UIView {
 }
 
 private final class StatusBarScrimView: UIView {
+  private let gradient = CAGradientLayer()
+
   override init(frame: CGRect) {
     super.init(frame: frame)
     isUserInteractionEnabled = false
-    backgroundColor = UIColor.systemBackground.withAlphaComponent(0.8)
+    backgroundColor = .clear
+    gradient.colors = Self.colors
+    gradient.startPoint = CGPoint(x: 0.5, y: 0)
+    gradient.endPoint = CGPoint(x: 0.5, y: 1)
+    layer.addSublayer(gradient)
   }
 
   @available(*, unavailable)
   required init?(coder: NSCoder) { fatalError() }
 
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    gradient.frame = bounds
+  }
+
   override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
     super.traitCollectionDidChange(previousTraitCollection)
-    backgroundColor = UIColor.systemBackground.withAlphaComponent(0.8)
+    gradient.colors = Self.colors
+  }
+
+  func setHoldThenFade(holdHeight: CGFloat, fadeHeight: CGFloat) {
+    let total = holdHeight + fadeHeight
+    guard total > 0 else { return }
+    let holdEnd = holdHeight / total
+    gradient.locations = [0, NSNumber(value: holdEnd), 1]
+  }
+
+  private static var colors: [CGColor] {
+    let solid = UIColor.systemBackground.withAlphaComponent(0.8).cgColor
+    return [
+      solid,
+      solid,
+      UIColor.systemBackground.withAlphaComponent(0).cgColor
+    ]
   }
 }
 
@@ -62,6 +89,7 @@ final class ChatMessagesVC: UIViewController {
   private var headerTopConstraint: NSLayoutConstraint?
   private var statusBarBlurHeight: NSLayoutConstraint?
   private let headerBand: CGFloat = 60
+  private let statusBarFadeExtra: CGFloat = 100
 
   private let statusBarBlur: StatusBarScrimView = {
     let scrim = StatusBarScrimView()
@@ -301,7 +329,8 @@ final class ChatMessagesVC: UIViewController {
     let overlap = statusBarOverlap
     let topInset = overlap + headerBand
     headerTopConstraint?.constant = overlap
-    statusBarBlurHeight?.constant = overlap
+    statusBarBlurHeight?.constant = overlap + statusBarFadeExtra
+    statusBarBlur.setHoldThenFade(holdHeight: overlap, fadeHeight: statusBarFadeExtra)
     if abs(cv.contentInset.top - topInset) > 0.5 {
       var inset = cv.contentInset
       inset.top = topInset
