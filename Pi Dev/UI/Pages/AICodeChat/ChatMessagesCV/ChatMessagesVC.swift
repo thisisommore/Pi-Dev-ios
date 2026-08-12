@@ -47,7 +47,7 @@ final class ChatMessagesVC: UIViewController {
   init(store: ChatStore) {
     self.store = store
     self.cv = UICollectionView(frame: .zero, collectionViewLayout: ChatMessagesCVLayout())
-    self.cv.contentInset = UIEdgeInsets(top: 8, left: 8, bottom: 8, right: 8)
+    self.cv.contentInset = UIEdgeInsets(top: 8, left: 8, bottom: 28, right: 8)
     super.init(nibName: nil, bundle: nil)
   }
 
@@ -93,15 +93,22 @@ final class ChatMessagesVC: UIViewController {
       var lastCount = self.store.messages.count
       var lastTyping = self.store.isResponding
       var lastText: String? = self.store.messages.last?.text
+      var lastStreaming = self.store.messages.last?.isStreaming
+      var lastGenerating = self.store.generatingMessageId
       while !Task.isCancelled {
         try? await Task.sleep(for: .milliseconds(100))
         let count = self.store.messages.count
         let typing = self.store.isResponding
         let currentLastText = self.store.messages.last?.text
-        if count != lastCount || typing != lastTyping || currentLastText != lastText {
+        let streaming = self.store.messages.last?.isStreaming
+        let generating = self.store.generatingMessageId
+        if count != lastCount || typing != lastTyping || currentLastText != lastText
+          || streaming != lastStreaming || generating != lastGenerating {
           lastCount = count
           lastTyping = typing
           lastText = currentLastText
+          lastStreaming = streaming
+          lastGenerating = generating
           self.applySnapshot(animated: true)
         }
       }
@@ -211,6 +218,9 @@ final class ChatMessagesVC: UIViewController {
     hasher.combine(message.tools.count)
     hasher.combine(message.segments.count)
     hasher.combine(message.error != nil)
+    hasher.combine(message.isStreaming)
+    hasher.combine(message.id == store.messages.last?.id)
+    hasher.combine(store.generatingMessageId == nil)
     return hasher.finalize()
   }
 
