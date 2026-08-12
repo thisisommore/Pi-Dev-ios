@@ -989,14 +989,10 @@ final class SidebarStore {
         if self.sessions != sorted {
           self.sessions = sorted
         }
+        // Keep a valid selection; if none (e.g. "New chat"), leave unselected.
+        // Do not auto-pick sessions.first — that re-highlights the last chat after newChat.
         if let selected = self.selectedSessionId,
-           sorted.contains(where: { $0.id == selected }) {
-          // Keep the previously selected (or cached) session.
-        } else if let first = sorted.first {
-          if self.selectedSessionId != first.id {
-            self.selectedSessionId = first.id
-          }
-        } else if self.selectedSessionId != nil {
+           !sorted.contains(where: { $0.id == selected }) {
           self.selectedSessionId = nil
         }
         PiCache.saveSessions(sorted)
@@ -1043,16 +1039,27 @@ final class SidebarStore {
   }
 
   func newChat() async {
+    // Immediately clear sidebar selection so no existing session looks active.
+    await MainActor.run {
+      withAnimation(.snappy) {
+        selectedSessionId = nil
+        activeChat.cacheSessionId = nil
+      }
+      persistPrefs()
+    }
+    await activeChat.resetToSession(title: "New chat")
+
     do {
       _ = try await rpcClient.newSession()
-      await activeChat.resetToSession(title: "New chat")
       await loadSessions()
+      // Stay unselected while composing; server already switched to the new session.
       await MainActor.run {
-        withAnimation(.snappy) { selectedSessionId = sessions.first?.id }
+        selectedSessionId = nil
+        activeChat.cacheSessionId = nil
         persistPrefs()
       }
     } catch {
-      await activeChat.resetToSession(title: "New chat")
+      // UI already shows empty "New chat" with nothing selected.
     }
   }
 
