@@ -445,12 +445,8 @@ final class ChatStore: Identifiable {
     }
 
     let toolCalls = agentMessage.content?.toolCalls() ?? []
-    message.tools = toolCalls.map { call in
-      let detail = formatToolDetail(name: call.name, arguments: call.arguments)
-      return ToolUse(kind: toolKind(for: call.name), name: call.name, detail: detail, symbol: toolSymbol(for: call.name), callId: call.id)
-    }
-
     // Rehydrate terminal output from persisted toolResult entries (for history reload after restart).
+    // Best practice: for bash, terminal (command+output) is the single source of truth — suppress duplicate ToolChip.
     var terminalRuns: [TerminalRun] = []
     var terminalByCallId: [String: TerminalRun] = [:]
     for call in toolCalls where call.name.lowercased().contains("bash") {
@@ -463,19 +459,32 @@ final class ChatStore: Identifiable {
     }
     message.terminal = terminalRuns
 
+    // For bash with terminal available, the TerminalBlock alone represents the execution (command + output + exitCode).
+    // Keep ToolChip only for non-bash tools to avoid duplicate command display.
+    let filteredToolCalls = toolCalls.filter { call in
+      if call.name.lowercased().contains("bash"), let cid = call.id, terminalByCallId[cid] != nil {
+        return false
+      }
+      return true
+    }
+    message.tools = filteredToolCalls.map { call in
+      let detail = formatToolDetail(name: call.name, arguments: call.arguments)
+      return ToolUse(kind: toolKind(for: call.name), name: call.name, detail: detail, symbol: toolSymbol(for: call.name), callId: call.id)
+    }
+
     if let built = buildSegments(from: agentMessage.content) {
       var segments = built.segments
-      // Interleave terminal runs after their tool chip, mirroring live streaming logic.
-      for call in toolCalls.reversed() where call.name.lowercased().contains("bash") {
-        guard let callId = call.id, let run = terminalByCallId[callId] else { continue }
-        if let chipIndex = segments.lastIndex(where: { segment in
-          guard case .tool(let tool) = segment else { return false }
-          return tool.callId == callId
-        }) {
-          segments.insert(.terminal(run), at: chipIndex + 1)
-        } else {
-          segments.append(.terminal(run))
+      // Remove duplicate bash tool segments where terminal will be shown instead.
+      segments = segments.filter { seg in
+        if case .tool(let tool) = seg, tool.name.lowercased().contains("bash"), let cid = tool.callId, terminalByCallId[cid] != nil {
+          return false
         }
+        return true
+      }
+      // Append terminal blocks in original toolCall order (preserves interleaving with non-bash tools).
+      for call in toolCalls where call.name.lowercased().contains("bash") {
+        guard let callId = call.id, let run = terminalByCallId[callId] else { continue }
+        segments.append(.terminal(run))
       }
       message.segments = segments
       message.text = built.text
@@ -485,7 +494,6 @@ final class ChatStore: Identifiable {
       message.code = code
       message.text = textWithoutCode.trimmingCharacters(in: .whitespacesAndNewlines)
       if !terminalRuns.isEmpty {
-        // Ensure terminal is visible even when there are no text segments.
         message.segments = terminalRuns.map { .terminal($0) }
       }
     }
@@ -871,20 +879,26 @@ final class ChatStore: Identifiable {
 
       case .toolExecutionEnd(let toolCallId, let toolName, let result, let isError):
         let name = latestToolNames[toolCallId] ?? toolName
-        if name == "bash" {
+        if name.lowercased().contains("bash") {
           let command = result.details?["command"]?.value as? String ?? ""
           let exitCode = (result.details?["exitCode"]?.value as? Int) ?? (isError ? 1 : 0)
           updateMessage(at: currentIndex) {
             let run = TerminalRun(command: command, output: result.textOutput, exitCode: exitCode)
             $0.terminal.append(run)
-            // Insert the output right after its own command chip, wherever
-            // that chip is — executions may finish in any order.
-            if let chipIndex = $0.segments.lastIndex(where: { segment in
+            // Best practice: bash terminal (command+output) is single source of truth — remove duplicate Tool chip.
+            $0.tools.removeAll { $0.callId == toolCallId && $0.name.lowercased().contains("bash") }
+            if let chipIndex = $0.segments.firstIndex(where: { segment in
               guard case .tool(let tool) = segment else { return false }
               return tool.callId == toolCallId
             }) {
-              $0.segments.insert(.terminal(run), at: chipIndex + 1)
+              $0.segments.remove(at: chipIndex)
+              $0.segments.insert(.terminal(run), at: chipIndex)
             } else {
+              // Fallback: remove any matching tool segment and append terminal
+              $0.segments.removeAll { seg in
+                if case .tool(let t) = seg { return t.callId == toolCallId }
+                return false
+              }
               $0.segments.append(.terminal(run))
             }
           }
