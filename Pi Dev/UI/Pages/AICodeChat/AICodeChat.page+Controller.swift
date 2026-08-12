@@ -37,8 +37,21 @@ final class ChatStore: Identifiable {
   var isStreaming: Bool { messages.contains { $0.isStreaming } }
   var generatingMessageId: UUID? = nil
 
+  // Stable UUID per queue entry — avoids ForEach diff glitches when removing by offset.
+  private var queuedMessageIDs: [UUID] = []
+
   var queuedMessagesForDisplay: [QueuedMessage] {
-    messageQueue.enumerated().reversed().map { QueuedMessage(id: $0.offset, text: $0.element) }
+    // Sync ID array with queue count (preserve existing IDs for stable diff).
+    if queuedMessageIDs.count != messageQueue.count {
+      if queuedMessageIDs.count < messageQueue.count {
+        queuedMessageIDs.append(contentsOf: (queuedMessageIDs.count..<messageQueue.count).map { _ in UUID() })
+      } else {
+        queuedMessageIDs.removeLast(queuedMessageIDs.count - messageQueue.count)
+      }
+    }
+    return messageQueue.enumerated().reversed().map { idx, text in
+      QueuedMessage(id: queuedMessageIDs[idx], text: text, queueIndex: idx)
+    }
   }
 
   /// - Parameter connectToServer: When `false`, skip RPC bootstrap (previews / offline mocks).
@@ -548,6 +561,9 @@ final class ChatStore: Identifiable {
   private func processQueue() {
     guard !messageQueue.isEmpty, !isResponding, !isStreaming else { return }
     let next = messageQueue.removeFirst()
+    if queuedMessageIDs.indices.contains(0) {
+      queuedMessageIDs.remove(at: 0)
+    }
     sendNow(next, repo: includedRepo)
   }
 
@@ -555,7 +571,15 @@ final class ChatStore: Identifiable {
     guard messageQueue.indices.contains(index) else { return }
     _ = withAnimation(.snappy) {
       messageQueue.remove(at: index)
+      if queuedMessageIDs.indices.contains(index) {
+        queuedMessageIDs.remove(at: index)
+      }
     }
+  }
+
+  func removeQueuedMessage(id: UUID) {
+    guard let display = queuedMessagesForDisplay.first(where: { $0.id == id }) else { return }
+    removeQueuedMessage(at: display.queueIndex)
   }
 
   func retry(from assistantMessageId: UUID) {

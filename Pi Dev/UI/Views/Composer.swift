@@ -84,7 +84,7 @@ struct Composer: View {
           VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(store.queuedMessagesForDisplay.enumerated()), id: \.element.id) { index, queued in
               QueuedMessageRow(queued: queued, isFirst: index == 0) {
-                store.removeQueuedMessage(at: queued.id)
+                store.removeQueuedMessage(id: queued.id)
               }
             }
           }

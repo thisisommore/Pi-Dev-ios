@@ -38,6 +38,11 @@ struct MessageList: View {
         .scrollEdgeEffectStyle(.soft, for: .all)
         .defaultScrollAnchor(.bottom)
         .onScrollGeometryChange(for: Bool.self, of: { geometry in
+          // Small content (contentSize <= bounds) is always “near bottom” — we want
+          // auto-scroll on first messages. Otherwise check against threshold.
+          if geometry.contentSize.height <= geometry.bounds.height + 1 {
+            return true
+          }
           let threshold: CGFloat = 80
           let visibleBottom = geometry.contentOffset.y + geometry.bounds.height
           return visibleBottom >= geometry.contentSize.height - threshold
