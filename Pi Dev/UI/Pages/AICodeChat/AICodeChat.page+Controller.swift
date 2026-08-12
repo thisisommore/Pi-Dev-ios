@@ -33,6 +33,9 @@ final class ChatStore: Identifiable {
   /// Called after any prompt stream completes to refresh sidebar via RPC.
   /// SidebarStore sets this to trigger loadSessions() on the main actor.
   var onStreamCompleted: (() async -> Void)?
+  /// Called as soon as the first token arrives for a new-chat draft, so the
+  /// sidebar can appear via RPC without waiting for the full stream.
+  var onFirstTokenForNewChat: (() async -> Void)?
 
   private let rpcClient = PiRPCClient()
 
@@ -780,6 +783,7 @@ final class ChatStore: Identifiable {
     var thinkingStartTime: Date?
     var currentIndex = messageIndex
     var finalizedCurrentTurn = false
+    var didTriggerFirstTokenRefresh = false
 
     func updateThinkingSeconds() {
       guard let start = thinkingStartTime else { return }
@@ -842,6 +846,15 @@ final class ChatStore: Identifiable {
               $0.segments[lastIndex] = .text(id: segmentId, text: existing + text)
             } else {
               $0.segments.append(.text(text: text))
+            }
+          }
+          // As soon as first token arrives for a new-chat (unselected draft),
+          // trigger sidebar refresh via RPC so it appears without waiting
+          // for the full stream to complete.
+          if !didTriggerFirstTokenRefresh, expectedSessionId == nil, let onFirstTokenForNewChat {
+            didTriggerFirstTokenRefresh = true
+            Task { @MainActor in
+              await onFirstTokenForNewChat()
             }
           }
         case .thinkingStart:
@@ -1205,6 +1218,9 @@ final class SidebarStore {
     activeChat.onStreamCompleted = { [weak self] in
       await self?.refreshSessionsAfterPrompt()
     }
+    activeChat.onFirstTokenForNewChat = { [weak self] in
+      await self?.handleFirstTokenForNewChat()
+    }
     guard connectToServer else { return }
     hydrateFromCache()
     Task { @MainActor in
@@ -1217,6 +1233,23 @@ final class SidebarStore {
   /// title/firstMessage without requiring app reload or another newChat.
   private func refreshSessionsAfterPrompt() async {
     // Don't block the chat UI — loadSessions is already MainActor and lightweight.
+    await loadSessions()
+  }
+
+  /// Called as soon as first token arrives for an unselected new-chat draft.
+  /// Triggers an early RPC refresh so the sidebar appears without waiting
+  /// for the full stream to complete.
+  private func handleFirstTokenForNewChat() async {
+    guard selectedSessionId == nil, !activeChat.messages.isEmpty else { return }
+    // Try to adopt via getState first (more accurate than newest-by-modified).
+    do {
+      let state = try await rpcClient.getState()
+      if let newId = state.data?.sessionId, !newId.isEmpty {
+        await adoptNewChatSession(newId)
+        return
+      }
+    } catch {}
+    // Fallback: just refresh the list; draft preview already shows locally.
     await loadSessions()
   }
 
@@ -1318,6 +1351,14 @@ final class SidebarStore {
   }
 
   func sessionTitle(_ session: SessionInfo) -> String {
+    // For the currently selected session, prefer the live chatTitle so the
+    // sidebar updates instantly (before server's firstMessage is persisted).
+    if session.id == selectedSessionId {
+      let live = activeChat.chatTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+      if !live.isEmpty, live != "New chat" {
+        return live
+      }
+    }
     if let name = session.name?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
       return name
     }
@@ -1520,6 +1561,9 @@ final class SidebarStore {
     }
     activeChat.onStreamCompleted = { [weak self] in
       await self?.refreshSessionsAfterPrompt()
+    }
+    activeChat.onFirstTokenForNewChat = { [weak self] in
+      await self?.handleFirstTokenForNewChat()
     }
     PiCache.clearAll()
   }
