@@ -67,11 +67,10 @@ final class ChatStore: Identifiable {
     if !models.isEmpty {
       availableModels = models
     }
+    // Only restore a known selection — never invent models.first.
     let modelId = preferredModelId ?? snapshot.selectedModelId
     if let modelId, let match = availableModels.first(where: { $0.id == modelId }) {
       selectedModel = match
-    } else if selectedModel == nil {
-      selectedModel = availableModels.first
     }
   }
 
@@ -80,9 +79,12 @@ final class ChatStore: Identifiable {
     availableModels = models
     if let preferredModelId, let match = models.first(where: { $0.id == preferredModelId }) {
       selectedModel = match
-    } else if selectedModel == nil || !models.contains(where: { $0.id == selectedModel?.id }) {
-      selectedModel = models.first
+    } else if let selected = selectedModel,
+              !models.contains(where: { $0.id == selected.id }) {
+      // Cached selection no longer offered by this server.
+      selectedModel = nil
     }
+    // Otherwise leave nil so the UI shows "Model" until get_state / user pick.
   }
 
   func loadAvailableModels() async {
@@ -93,12 +95,16 @@ final class ChatStore: Identifiable {
         if self.availableModels != models {
           self.availableModels = models
         }
-        if self.selectedModel == nil
-            || !models.contains(where: { $0.id == self.selectedModel?.id }) {
-          self.selectedModel = models.first
+        // Never auto-pick the first model — stay unselected until server state
+        // (apply) or an explicit user choice provides the real selection.
+        if let selected = self.selectedModel,
+           !models.contains(where: { $0.id == selected.id }) {
+          self.selectedModel = nil
         }
         PiCache.saveModels(models)
-        PiCache.saveLastModelId(selectedModel?.id)
+        if let id = selectedModel?.id {
+          PiCache.saveLastModelId(id)
+        }
       }
     } catch {
       // Keep cached models if the server is unreachable.
@@ -164,8 +170,12 @@ final class ChatStore: Identifiable {
   }
 
   private func apply(state: AgentState) {
-    if let model = state.model, selectedModel != model {
-      self.selectedModel = model
+    // Server is source of truth for the active model.
+    if let model = state.model {
+      if selectedModel != model {
+        self.selectedModel = model
+      }
+      PiCache.saveLastModelId(model.id)
     }
     if let levelString = state.thinkingLevel {
       let level = ThinkingLevel(id: levelString)
