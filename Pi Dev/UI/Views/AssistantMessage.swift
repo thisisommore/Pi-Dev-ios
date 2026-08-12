@@ -210,6 +210,7 @@ struct AssistantMessage: View {
                     .lineSpacing(3)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 12)
                 case .table(let table):
                   MarkdownTableView(table: table)
                 }
@@ -248,6 +249,7 @@ struct AssistantMessage: View {
                 .lineSpacing(3)
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 12)
             case .table(let table):
               MarkdownTableView(table: table)
             }
