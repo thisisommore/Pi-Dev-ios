@@ -140,7 +140,7 @@ struct Composer: View {
         .scrollClipDisabled()
       }
 
-      ZStack(alignment: .topTrailing) {
+      HStack(alignment: .top, spacing: 8) {
         TextField(
           store.editingMessageId != nil ? "Edit message…" : "Ask about your code…",
           text: $store.draft,
@@ -167,30 +167,31 @@ struct Composer: View {
             store.draft = ""
           }
         }
-        // Room for the expand control on the first line.
-        .padding(.trailing, canExpandDraft ? 26 : 0)
+        .frame(maxWidth: .infinity, alignment: .leading)
 
         if canExpandDraft {
           Button {
             focused = false
             showExpandSheet = true
           } label: {
-            Image(systemName: "arrow.up.backward.and.arrow.down.forward")
-              .font(.caption2.weight(.semibold))
-              .foregroundStyle(.tertiary)
-              .frame(width: 20, height: 20)
-              .contentShape(.rect)
+            Image(systemName: "arrow.up.left.and.arrow.down.right")
+              .font(.system(size: 14, weight: .semibold))
+              .foregroundStyle(.secondary)
+              .frame(width: 36, height: 36)
+              .background(Color.primary.opacity(0.06), in: .circle)
+              .contentShape(.circle)
           }
-          // Align with the first line of `.callout` text.
-          .padding(.top, 2)
           .buttonStyle(.plain)
           .accessibilityLabel("Expand editor")
-          .transition(.opacity)
+          // Sit on the first text line (callout ~22pt) inside a 36pt control.
+          .padding(.top, -2)
+          .transition(.opacity.combined(with: .scale(scale: 0.9)))
         }
       }
       .animation(.snappy(duration: 0.15), value: canExpandDraft)
-      .padding(.top, hasAttachments ? 8 : 14)
-      .padding(.horizontal, 14)
+      .padding(.top, hasAttachments ? 8 : 12)
+      .padding(.leading, 14)
+      .padding(.trailing, canExpandDraft ? 10 : 14)
 
       toolbar
         // Keep controls above the home indicator.
