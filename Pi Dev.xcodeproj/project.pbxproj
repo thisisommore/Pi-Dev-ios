@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		A15D70A2302C1EB000D5DAD9 /* SQLiteData in Frameworks */ = {isa = PBXBuildFile; productRef = BD6D22FA927B159D6DC432B1 /* SQLiteData */; };
+		A15D70A3302C1EB000D5DAD9 /* SQLiteData in Frameworks */ = {isa = PBXBuildFile; productRef = 6E4A4D0F1D94286D174D07EC /* SQLiteData */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		A1A5947C2FFCD58800D00C24 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -84,6 +89,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A15D70A2302C1EB000D5DAD9 /* SQLiteData in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -105,6 +111,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A15D70A3302C1EB000D5DAD9 /* SQLiteData in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -171,6 +178,7 @@
 			);
 			name = "Pi Dev";
 			packageProductDependencies = (
+				BD6D22FA927B159D6DC432B1 /* SQLiteData */,
 			);
 			productName = "Pi Dev";
 			productReference = A1A5946E2FFCD58700D00C24 /* Pi Dev.app */;
@@ -193,8 +201,6 @@
 				A1A5947E2FFCD58800D00C24 /* Pi DevTests */,
 			);
 			name = "Pi DevTests";
-			packageProductDependencies = (
-			);
 			productName = "Pi DevTests";
 			productReference = A1A5947B2FFCD58800D00C24 /* Pi DevTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -216,8 +222,6 @@
 				A1A594882FFCD58800D00C24 /* Pi DevUITests */,
 			);
 			name = "Pi DevUITests";
-			packageProductDependencies = (
-			);
 			productName = "Pi DevUITests";
 			productReference = A1A594852FFCD58800D00C24 /* Pi DevUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
@@ -239,6 +243,7 @@
 			);
 			name = "Pi Dev Mac";
 			packageProductDependencies = (
+				6E4A4D0F1D94286D174D07EC /* SQLiteData */,
 			);
 			productName = "Pi Dev Mac";
 			productReference = A1EEC8783002339300AF36D4 /* Pi Dev Mac.app */;
@@ -261,8 +266,6 @@
 				A1EEC8873002339400AF36D4 /* Pi Dev MacTests */,
 			);
 			name = "Pi Dev MacTests";
-			packageProductDependencies = (
-			);
 			productName = "Pi Dev MacTests";
 			productReference = A1EEC8843002339400AF36D4 /* Pi Dev MacTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -284,8 +287,6 @@
 				A1EEC8913002339400AF36D4 /* Pi Dev MacUITests */,
 			);
 			name = "Pi Dev MacUITests";
-			packageProductDependencies = (
-			);
 			productName = "Pi Dev MacUITests";
 			productReference = A1EEC88E3002339400AF36D4 /* Pi Dev MacUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
@@ -333,6 +334,9 @@
 			);
 			mainGroup = A1A594652FFCD58700D00C24;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				422502E513D4AF4EA2CAF910 /* XCRemoteSwiftPackageReference "sqlite-data" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A1A5946F2FFCD58700D00C24 /* Products */;
 			projectDirPath = "";
@@ -952,6 +956,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		422502E513D4AF4EA2CAF910 /* XCRemoteSwiftPackageReference "sqlite-data" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/pointfreeco/sqlite-data";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		6E4A4D0F1D94286D174D07EC /* SQLiteData */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 422502E513D4AF4EA2CAF910 /* XCRemoteSwiftPackageReference "sqlite-data" */;
+			productName = SQLiteData;
+		};
+		BD6D22FA927B159D6DC432B1 /* SQLiteData */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 422502E513D4AF4EA2CAF910 /* XCRemoteSwiftPackageReference "sqlite-data" */;
+			productName = SQLiteData;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A1A594662FFCD58700D00C24 /* Project object */;
 }
