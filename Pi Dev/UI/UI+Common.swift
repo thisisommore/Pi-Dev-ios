@@ -29,6 +29,13 @@ let appLabel = Color(uiColor: UIColor { traits in
     : UIColor(white: 0.14, alpha: 1)
 })
 
+/// Header / chrome icons — more muted than body text.
+let appIcon = Color(uiColor: UIColor { traits in
+  traits.userInterfaceStyle == .dark
+    ? UIColor(white: 0.72, alpha: 1)
+    : UIColor(white: 0.38, alpha: 1)
+})
+
 /// Text / icons painted on solid ink fills.
 let appOnInk = Color(uiColor: UIColor { traits in
   traits.userInterfaceStyle == .dark

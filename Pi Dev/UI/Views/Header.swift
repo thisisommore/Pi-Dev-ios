@@ -28,6 +28,7 @@ struct Header: View {
         } label: {
           Image(systemName: "line.3.horizontal")
             .font(.system(size: 17, weight: .semibold))
+            .foregroundStyle(appIcon)
             .frame(width: 44, height: 44)
         }
         .buttonStyle(.plain)
@@ -57,7 +58,7 @@ struct Header: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .tint(.primary)
+        .tint(appIcon)
         .animation(.linear(duration: 0), value: store.chatTitle)
         .glassEffect(.regular.interactive(), in: .capsule)
 
@@ -76,6 +77,7 @@ struct Header: View {
         } label: {
           Image(systemName: "square.and.pencil")
             .font(.system(size: 17, weight: .semibold))
+            .foregroundStyle(appIcon)
             .frame(width: 44, height: 44)
         }
         .buttonStyle(.plain)
