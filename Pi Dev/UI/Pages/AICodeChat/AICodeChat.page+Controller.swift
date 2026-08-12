@@ -769,6 +769,7 @@ final class ChatStore: Identifiable {
 
   private func consumeStreamEvents(_ events: AsyncStream<AgentEvent>, at messageIndex: Int, expectedSessionId: String? = nil) async {
     var latestToolNames: [String: String] = [:]
+    var latestToolCommands: [String: String] = [:]
     var thinkingStartTime: Date?
     var currentIndex = messageIndex
     var finalizedCurrentTurn = false
@@ -867,7 +868,14 @@ final class ChatStore: Identifiable {
             $0.tools.append(tool)
             $0.segments.append(.tool(tool))
           }
-          if let id = call.id { latestToolNames[id] = call.name }
+          if let id = call.id {
+            latestToolNames[id] = call.name
+            if let cmd = call.arguments?["command"]?.value as? String, !cmd.isEmpty {
+              latestToolCommands[id] = cmd
+            } else if !detail.isEmpty {
+              latestToolCommands[id] = detail
+            }
+          }
         case .error(let reason):
           if stopRequested && isAbortError(reason) {
             break
@@ -880,7 +888,7 @@ final class ChatStore: Identifiable {
       case .toolExecutionEnd(let toolCallId, let toolName, let result, let isError):
         let name = latestToolNames[toolCallId] ?? toolName
         if name.lowercased().contains("bash") {
-          let command = result.details?["command"]?.value as? String ?? ""
+          let command = (result.details?["command"]?.value as? String).flatMap({ $0.isEmpty ? nil : $0 }) ?? latestToolCommands[toolCallId] ?? ""
           let exitCode = (result.details?["exitCode"]?.value as? Int) ?? (isError ? 1 : 0)
           updateMessage(at: currentIndex) {
             let run = TerminalRun(command: command, output: result.textOutput, exitCode: exitCode)
