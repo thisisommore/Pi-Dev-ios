@@ -201,7 +201,7 @@ struct AssistantMessage: View {
                 switch block {
                 case .paragraph(_, let attributed):
                   Text(attributed)
-                    .font(.callout)
+                    .font(.subheadline)
                     .lineSpacing(3)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -239,7 +239,7 @@ struct AssistantMessage: View {
             switch block {
             case .paragraph(_, let attributed):
               Text(attributed)
-                .font(.callout)
+                .font(.subheadline)
                 .lineSpacing(3)
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
