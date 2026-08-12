@@ -4,8 +4,9 @@
 //
 //  Custom UICollectionView-based chat list — ported from Haven's
 //  ChatMessages+Controller.swift (iOS 17.2) and adapted for ChatStore/ChatMessage.
-//  Uses UICollectionViewFlowLayout with self-sizing via UIHostingConfiguration
-//  for correct multiline height, plus Haven's scroll behaviour.
+//  Uses Haven's ChatMessagesCVLayout (per-item align + vertical stack) and
+//  measures SwiftUI rows at the collection width so text wraps instead of
+//  overflowing. Composer/keyboard insets are owned by SwiftUI.
 //
 
 import SwiftUI
@@ -21,6 +22,8 @@ final class ChatMessagesVC: UIViewController {
   private(set) var isNearBottom: Bool = true
   var tempButtonDisable = true
   private var previousViewSize: CGFloat = 0
+  private var lastMeasuredWidth: CGFloat = 0
+  private var heightCache: [UUID: (signature: Int, height: CGFloat)] = [:]
 
   private lazy var scrollToBottomButton: UIButton = {
     let btn = UIButton(type: .system)
@@ -43,12 +46,8 @@ final class ChatMessagesVC: UIViewController {
 
   init(store: ChatStore) {
     self.store = store
-    let layout = UICollectionViewFlowLayout()
-    layout.estimatedItemSize = UICollectionViewFlowLayout.automaticSize
-    layout.minimumLineSpacing = 10
-    layout.minimumInteritemSpacing = 0
-    layout.sectionInset = UIEdgeInsets(top: 8, left: 8, bottom: 8, right: 8)
-    self.cv = UICollectionView(frame: .zero, collectionViewLayout: layout)
+    self.cv = UICollectionView(frame: .zero, collectionViewLayout: ChatMessagesCVLayout())
+    self.cv.contentInset = UIEdgeInsets(top: 8, left: 8, bottom: 8, right: 8)
     super.init(nibName: nil, bundle: nil)
   }
 
@@ -63,13 +62,15 @@ final class ChatMessagesVC: UIViewController {
     cv.register(HostingCell.self, forCellWithReuseIdentifier: HostingCell.reuseID)
     cv.alwaysBounceVertical = true
     cv.keyboardDismissMode = .interactive
+    cv.clipsToBounds = true
+    cv.alwaysBounceHorizontal = false
     view.addSubview(cv)
     cv.translatesAutoresizingMaskIntoConstraints = false
     NSLayoutConstraint.activate([
       cv.topAnchor.constraint(equalTo: view.topAnchor),
       cv.leadingAnchor.constraint(equalTo: view.leadingAnchor),
       cv.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-      cv.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor)
+      cv.bottomAnchor.constraint(equalTo: view.bottomAnchor)
     ])
 
     let tap = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
@@ -80,7 +81,7 @@ final class ChatMessagesVC: UIViewController {
     scrollToBottomButton.translatesAutoresizingMaskIntoConstraints = false
     NSLayoutConstraint.activate([
       scrollToBottomButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-      scrollToBottomButton.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor, constant: -20),
+      scrollToBottomButton.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -20),
       scrollToBottomButton.widthAnchor.constraint(equalToConstant: 40),
       scrollToBottomButton.heightAnchor.constraint(equalToConstant: 40)
     ])
@@ -117,17 +118,17 @@ final class ChatMessagesVC: UIViewController {
   func applySnapshot(animated: Bool) {
     let newItems: [ChatCVItem] = store.messages.map { .message($0.id) } + (store.isResponding ? [.typing] : [])
     let wasNearBottom = isNearBottom
+    let shouldAnimate = animated && !store.isStreaming
     if newItems != items {
       items = newItems
       cv.reloadData()
       cv.layoutIfNeeded()
     } else {
-      // Streaming text grew — invalidate layout to recalc self-sizing height
       cv.collectionViewLayout.invalidateLayout()
     }
     if wasNearBottom, let last = newItems.last {
       DispatchQueue.main.async {
-        self.scrollToItem(last, animated: animated)
+        self.scrollToItem(last, animated: shouldAnimate)
       }
     }
   }
@@ -185,34 +186,77 @@ final class ChatMessagesVC: UIViewController {
 
   override func viewDidLayoutSubviews() {
     super.viewDidLayoutSubviews()
+    let width = cv.cvAvailableWidth()
+    if width > 0, abs(width - lastMeasuredWidth) > 0.5 {
+      lastMeasuredWidth = width
+      heightCache.removeAll()
+      cv.collectionViewLayout.invalidateLayout()
+    }
     preserveBottomOffset()
   }
 
   override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
     super.viewWillTransition(to: size, with: coordinator)
-    coordinator.animate(alongsideTransition: { _ in self.cv.collectionViewLayout.invalidateLayout() })
+    coordinator.animate(alongsideTransition: { _ in
+      self.heightCache.removeAll()
+      self.cv.collectionViewLayout.invalidateLayout()
+    })
+  }
+
+  private func contentSignature(for message: ChatMessage) -> Int {
+    var hasher = Hasher()
+    hasher.combine(message.text.count)
+    hasher.combine(message.thinking?.full.count ?? 0)
+    hasher.combine(message.thinking?.summary.count ?? 0)
+    hasher.combine(message.tools.count)
+    hasher.combine(message.segments.count)
+    hasher.combine(message.error != nil)
+    return hasher.finalize()
+  }
+
+  private func measureHeight<V: View>(of view: V, width: CGFloat) -> CGFloat {
+    let config = UIHostingConfiguration {
+      view
+        .frame(width: width, alignment: .topLeading)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    .margins(.all, 0)
+    let content = config.makeContentView()
+    let size = content.systemLayoutSizeFitting(
+      CGSize(width: width, height: 0),
+      withHorizontalFittingPriority: .required,
+      verticalFittingPriority: .fittingSizeLevel
+    )
+    return max(1, ceil(size.height))
   }
 }
 
-// MARK: - DataSource & Delegate
+// MARK: - UICollectionViewDataSource & Delegate (Haven parity)
 
 extension ChatMessagesVC: UICollectionViewDataSource {
   func numberOfSections(in collectionView: UICollectionView) -> Int { 1 }
-  func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int { items.count }
+  func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+    items.count
+  }
   func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
     let cell = collectionView.dequeueReusableCell(withReuseIdentifier: HostingCell.reuseID, for: indexPath) as! HostingCell
+    let width = collectionView.cvAvailableWidth()
     let item = items[indexPath.item]
     switch item {
     case .message(let id):
-      cell.hostSwiftUI(MessageRow(messageId: id, store: store))
+      if store.messages.contains(where: { $0.id == id }) {
+        cell.hostSwiftUI(MessageRow(messageId: id, store: store), width: width)
+      } else {
+        cell.hostSwiftUI(EmptyView(), width: width)
+      }
     case .typing:
-      cell.hostSwiftUI(TypingIndicator(tint: appColor))
+      cell.hostSwiftUI(TypingIndicator(tint: appColor), width: width)
     }
     return cell
   }
 }
 
-extension ChatMessagesVC: UICollectionViewDelegate {
+extension ChatMessagesVC: ChatMessagesCVLayoutDelegate, UICollectionViewDelegate {
   func scrollViewDidScroll(_ scrollView: UIScrollView) {
     let distFromBottom = distanceFromBottom(minY: scrollView.contentOffset.y, viewSize: scrollView.bounds.height, contentSize: scrollView.contentSize.height)
     isNearBottom = distFromBottom < 1
@@ -225,16 +269,50 @@ extension ChatMessagesVC: UICollectionViewDelegate {
       }
     }
   }
+
+  func collectionView(_ collectionView: UICollectionView, layout _: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
+    let width = collectionView.cvAvailableWidth()
+    guard width > 0 else { return CGSize(width: 1, height: 1) }
+    guard indexPath.item < items.count else { return CGSize(width: width, height: 80) }
+    switch items[indexPath.item] {
+    case .message(let id):
+      guard let message = store.messages.first(where: { $0.id == id }) else {
+        return CGSize(width: width, height: 1)
+      }
+      let signature = contentSignature(for: message)
+      if let cached = heightCache[id], cached.signature == signature {
+        return CGSize(width: width, height: cached.height)
+      }
+      let height = measureHeight(of: MessageRow(messageId: id, store: store), width: width)
+      heightCache[id] = (signature, height)
+      return CGSize(width: width, height: height)
+    case .typing:
+      return CGSize(width: width, height: 40)
+    }
+  }
+
+  func collectionView(_: UICollectionView, layout _: UICollectionViewLayout, alignForItemAt _: IndexPath) -> ChatCVAlign {
+    // Full-width rows: UserBubble Spacer right-aligns; assistant text wraps.
+    .left
+  }
+
+  func prepareDone() {}
 }
 
-// MARK: - Self-sizing hosting cell (iOS 16+ UIHostingConfiguration)
+// MARK: - Self-sizing hosting cell
 
 private final class HostingCell: UICollectionViewCell {
   static let reuseID = "HostingCell"
-  func hostSwiftUI<V: View>(_ view: V) {
-    contentConfiguration = UIHostingConfiguration { view }
-      .margins(.all, 0)
+
+  func hostSwiftUI<V: View>(_ view: V, width: CGFloat) {
+    contentConfiguration = UIHostingConfiguration {
+      view
+        .frame(width: width, alignment: .topLeading)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    .margins(.all, 0)
   }
+
   override func prepareForReuse() {
     super.prepareForReuse()
     contentConfiguration = nil

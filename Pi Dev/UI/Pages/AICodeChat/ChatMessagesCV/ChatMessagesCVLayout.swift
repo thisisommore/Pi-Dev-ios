@@ -61,14 +61,17 @@ final class ChatMessagesCVLayout: UICollectionViewLayout {
       let spacing = spacingBeforeItem(at: indexPath)
       let size = delegate.collectionView(collectionView, layout: self, sizeForItemAt: indexPath)
       let alignment = delegate.collectionView(collectionView, layout: self, alignForItemAt: indexPath)
+      let available = collectionView.cvAvailableWidth()
+      let cellWidth = min(size.width, available)
+      let cellSize = CGSize(width: cellWidth, height: size.height)
       let x: CGFloat = switch alignment {
       case .left: 0
-      case .right: collectionView.cvAvailableWidth() - size.width
-      case .center: (collectionView.cvAvailableWidth() - size.width) / 2
+      case .right: available - cellWidth
+      case .center: (available - cellWidth) / 2
       }
       let attributes = UICollectionViewLayoutAttributes(forCellWith: indexPath)
-      attributes.frame = CGRect(origin: CGPoint(x: x, y: height + spacing), size: size)
-      height += (size.height + spacing)
+      attributes.frame = CGRect(origin: CGPoint(x: x, y: height + spacing), size: cellSize)
+      height += (cellSize.height + spacing)
       cachedAttributes.append(attributes)
 
       if attributes.frame.intersects(collectionView.bounds) {
@@ -130,6 +133,11 @@ final class ChatMessagesCVLayout: UICollectionViewLayout {
   override func layoutAttributesForItem(at indexPath: IndexPath) -> UICollectionViewLayoutAttributes? {
     guard indexPath.item < cachedAttributes.count else { return nil }
     return cachedAttributes[indexPath.item]
+  }
+
+  override func shouldInvalidateLayout(forBoundsChange newBounds: CGRect) -> Bool {
+    guard let collectionView else { return false }
+    return abs(newBounds.width - collectionView.bounds.width) > 0.5
   }
 
   override func targetContentOffset(forProposedContentOffset proposedContentOffset: CGPoint) -> CGPoint {

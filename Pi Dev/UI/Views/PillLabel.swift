@@ -17,6 +17,8 @@ struct PillLabel: View {
       }
       Text(text)
         .font(.caption.weight(.semibold))
+        .lineLimit(1)
+        .truncationMode(.tail)
       Image(systemName: "chevron.up.chevron.down")
         .font(.system(size: 7, weight: .bold))
         .foregroundStyle(.tertiary)

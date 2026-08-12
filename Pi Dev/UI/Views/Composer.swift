@@ -326,6 +326,7 @@ struct Composer: View {
       }
       .buttonStyle(.plain)
       .glassEffect(.regular.interactive(), in: .capsule)
+      .layoutPriority(0)
 
       Menu {
         Picker("Thinking", selection: $store.thinkingLevel) {
@@ -344,8 +345,9 @@ struct Composer: View {
       }
       .buttonStyle(.plain)
       .glassEffect(.regular.interactive(), in: .capsule)
+      .fixedSize()
 
-      Spacer()
+      Spacer(minLength: 4)
 
       Menu {
         Button {
@@ -368,6 +370,7 @@ struct Composer: View {
       .buttonStyle(.plain)
       .menuStyle(.borderlessButton)
       .tint(.primary)
+      .layoutPriority(1)
 
       if store.isGenerating {
         Button {
@@ -382,6 +385,7 @@ struct Composer: View {
         .buttonStyle(.plain)
         .accessibilityLabel("Stop generation")
         .transition(.scale.combined(with: .opacity))
+        .layoutPriority(1)
       } else {
         Button {
           focused = false
@@ -399,6 +403,7 @@ struct Composer: View {
         .buttonStyle(.plain)
         .disabled(!canSendMessage)
         .animation(.snappy, value: canSendMessage)
+        .layoutPriority(1)
       }
     }
     .frame(maxWidth: .infinity)
