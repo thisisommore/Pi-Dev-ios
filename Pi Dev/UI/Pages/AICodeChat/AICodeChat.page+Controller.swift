@@ -260,6 +260,24 @@ final class ChatStore: Identifiable {
     }
   }
 
+  func renameSession(to newTitle: String) async {
+    let trimmed = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty, trimmed != chatTitle else { return }
+    let oldTitle = chatTitle
+    // Optimistic update for instant UI.
+    chatTitle = trimmed
+    do {
+      _ = try await rpcClient.setSessionName(trimmed)
+      // Persist locally and refresh server state (sessionName).
+      persistChatCache()
+      await syncStateFromServer()
+    } catch {
+      // Revert on failure — keep cache consistent.
+      chatTitle = oldTitle
+      // Also try to inform user via error? For now silent revert.
+    }
+  }
+
   private func buildSupportedThinkingLevels(from map: [String: String?]?) -> [ThinkingLevel] {
     var levels = ThinkingLevel.defaultLevels.filter { level in
       guard let map, let entry = map[level.id] else { return true }

@@ -91,9 +91,8 @@ struct Header: View {
       TextField("Chat name", text: $renameDraft)
       Button("Cancel", role: .cancel) {}
       Button("Save") {
-        let trimmed = renameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty {
-          store.chatTitle = trimmed
+        Task { @MainActor in
+          await store.renameSession(to: renameDraft)
         }
       }
     }

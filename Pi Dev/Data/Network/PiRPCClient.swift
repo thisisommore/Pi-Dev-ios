@@ -206,6 +206,10 @@ final class PiRPCClient {
     try await send(command: ["type": "new_session"])
   }
 
+  func setSessionName(_ name: String) async throws -> RPCResponse<EmptyResponse> {
+    try await send(command: ["type": "set_session_name", "name": name])
+  }
+
   // MARK: - Generic request
 
   func send<T: Decodable>(command: [String: Any]) async throws -> RPCResponse<T> {

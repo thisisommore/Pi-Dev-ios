@@ -261,6 +261,8 @@ struct Composer: View {
         }
         .onChange(of: store.draft) { oldValue, newValue in
           guard store.editingMessageId == nil else { return }
+          // Don't treat slash-command autocomplete as a paste.
+          if newValue.trimmingCharacters(in: .whitespaces).hasPrefix("/") { return }
           let delta = newValue.count - oldValue.count
           if delta > 3 && newValue.count > 50 {
             store.pastedItems.append(PastedItem(content: newValue))

@@ -30,9 +30,10 @@ struct SetupView: View {
   }
 
   private var canContinue: Bool {
-    !isChecking
-      && URL(string: normalizedURL) != nil
-      && !tokenDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    guard !isChecking else { return false }
+    guard !tokenDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+    guard let url = URL(string: normalizedURL), url.host != nil, url.scheme?.hasPrefix("http") == true else { return false }
+    return true
   }
 
   var body: some View {
