@@ -12,35 +12,35 @@ import Foundation
 /// matching `response` object.  Streaming events can be consumed via SSE on
 /// `/events` or by polling `get_last_assistant_text` when SSE is unavailable.
 final class PiRPCClient {
-  let baseURL: URL
+  let baseURL: URL?
   let authToken: String
   private let urlSession: URLSession
   private var activeTask: Task<Void, Never>?
   private let lock = NSLock()
 
-  init(baseURL: URL = PiRPCClient.configuredBaseURL(), authToken: String = PiRPCClient.configuredAuthToken(), urlSession: URLSession = .shared) {
+  init(baseURL: URL? = PiRPCClient.configuredBaseURL(), authToken: String = PiRPCClient.configuredAuthToken(), urlSession: URLSession = .shared) {
     self.baseURL = baseURL
     self.authToken = authToken
     self.urlSession = urlSession
   }
 
-  private static func configuredBaseURL() -> URL {
+  private static func configuredBaseURL() -> URL? {
     let stored = UserDefaults.standard.string(forKey: "piServerBaseURL")
     let raw = stored?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    if raw.isEmpty { return nil }
     // Normalize bare hostnames like "pi.sh.ommore.xyz" → https://...
     let normalized: String = {
-      if raw.isEmpty { return raw }
       if raw.hasPrefix("http://") || raw.hasPrefix("https://") { return raw }
       return "https://" + raw
     }()
-    if let url = URL(string: normalized), !normalized.isEmpty, url.host != nil {
+    if let url = URL(string: normalized), url.host != nil {
       return url
     }
-    // Fall back to raw if it at least parses (legacy), else localhost.
-    if let url = URL(string: raw), !raw.isEmpty, url.host != nil {
+    // Fall back to raw if it at least parses (legacy)
+    if let url = URL(string: raw), url.host != nil {
       return url
     }
-    return URL(string: "http://localhost:3000")!
+    return nil
   }
 
   private static func configuredAuthToken() -> String {
@@ -49,13 +49,19 @@ final class PiRPCClient {
 
   /// Current values from UserDefaults (not the snapshot at init) — use for
   /// per-request auth/host to handle server switch without app restart.
-  /// For Setup healthCheck, fall back to the init baseURL when UserDefaults is still empty (pre-save).
-  private var currentBaseURL: URL {
-    let stored = UserDefaults.standard.string(forKey: "piServerBaseURL")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-    if stored.isEmpty { return baseURL }
-    return Self.configuredBaseURL()
+  /// Returns nil if no URL is configured — caller should fail instead of using localhost.
+  private var currentBaseURL: URL? {
+    if let cfg = Self.configuredBaseURL() { return cfg }
+    return baseURL
   }
   private var currentAuthToken: String { Self.configuredAuthToken() }
+
+  private func requireBaseURL() throws -> URL {
+    guard let url = currentBaseURL else {
+      throw RPCError(command: nil, message: "No server URL configured")
+    }
+    return url
+  }
 
   private func configureAuth(for request: inout URLRequest) {
     let token = currentAuthToken.isEmpty ? authToken : currentAuthToken
@@ -100,7 +106,7 @@ final class PiRPCClient {
   }
 
   func rerun(message: String? = nil, entryId: String? = nil) async throws -> String? {
-    let rerunURL = currentBaseURL.appendingPathComponent("rerun")
+    let rerunURL = try requireBaseURL().appendingPathComponent("rerun")
     var request = URLRequest(url: rerunURL)
     request.httpMethod = "POST"
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -181,7 +187,7 @@ final class PiRPCClient {
   // MARK: - Session REST endpoints
 
   func listSessions() async throws -> [SessionInfo] {
-    let sessionsURL = currentBaseURL.appendingPathComponent("sessions")
+    let sessionsURL = try requireBaseURL().appendingPathComponent("sessions")
     var request = URLRequest(url: sessionsURL)
     request.httpMethod = "GET"
     configureAuth(for: &request)
@@ -211,7 +217,7 @@ final class PiRPCClient {
   // MARK: - Generic request
 
   func send<T: Decodable>(command: [String: Any]) async throws -> RPCResponse<T> {
-    let rpcURL = currentBaseURL.appendingPathComponent("rpc")
+        let rpcURL = try requireBaseURL().appendingPathComponent("rpc")
     var request = URLRequest(url: rpcURL)
     request.httpMethod = "POST"
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -330,7 +336,7 @@ final class PiRPCClient {
   }
 
   private func readSSE(into continuation: AsyncStream<AgentEvent>.Continuation) async -> Bool {
-    let eventsURL = currentBaseURL.appendingPathComponent("events")
+    guard let eventsURL = try? requireBaseURL().appendingPathComponent("events") else { return false }
     var request = URLRequest(url: eventsURL)
     request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
     configureAuth(for: &request)

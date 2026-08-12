@@ -213,7 +213,7 @@ final class ChatStore: Identifiable {
   func loadAvailableModels() async {
     do {
       let response = try await rpcClient.getAvailableModels()
-      if let models = response.data?.models, !models.isEmpty {
+            if let models = response.data?.models, !models.isEmpty {
         // Background refresh: no animation; skip assign when unchanged.
         if self.availableModels != models {
           self.availableModels = models
@@ -228,9 +228,10 @@ final class ChatStore: Identifiable {
         if let id = selectedModel?.id {
           PiCache.saveLastModelId(id)
         }
-      }
+      } else {
+              }
     } catch {
-      // Keep cached models if the server is unreachable.
+            // Keep cached models if the server is unreachable.
     }
   }
 
