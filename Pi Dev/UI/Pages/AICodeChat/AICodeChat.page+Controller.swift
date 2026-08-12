@@ -363,6 +363,15 @@ final class ChatStore: Identifiable {
       let response = try await rpcClient.getEntries()
       guard let entries = response.data?.entries else { return }
 
+      // Collect toolResult outputs keyed by toolCallId so assistant messages can be rehydrated with terminal output.
+      var toolResults: [String: (output: String, isError: Bool)] = [:]
+      for entry in entries {
+        guard entry.type == "message", let msg = entry.message, let role = msg.role, role == "toolResult", let toolCallId = msg.toolCallId else { continue }
+        let output = msg.content?.textBlocks().joined(separator: "\n") ?? ""
+        let isError = msg.isError ?? false
+        toolResults[toolCallId] = (output, isError)
+      }
+
       let chatMessages = entries.compactMap { entry -> ChatMessage? in
         guard entry.type == "message", let agentMessage = entry.message else { return nil }
         guard let role = agentMessage.role else { return nil }
@@ -372,7 +381,7 @@ final class ChatStore: Identifiable {
           return ChatMessage(entryId: entry.id, role: .user, text: text, tokens: 0)
         } else if role == "assistant" {
           var message = ChatMessage(entryId: entry.id, role: .assistant, text: text, tokens: 0)
-          self.populate(message: &message, from: agentMessage)
+          self.populate(message: &message, from: agentMessage, toolResults: toolResults)
           return message
         }
         return nil
@@ -422,7 +431,7 @@ final class ChatStore: Identifiable {
     )
   }
 
-  private func populate(message: inout ChatMessage, from agentMessage: AgentMessage) {
+  private func populate(message: inout ChatMessage, from agentMessage: AgentMessage, toolResults: [String: (output: String, isError: Bool)] = [:]) {
     if let usage = agentMessage.usage {
       message.tokens = usage.totalTokens ?? ((usage.input ?? 0) + (usage.output ?? 0))
     }
@@ -438,17 +447,47 @@ final class ChatStore: Identifiable {
     let toolCalls = agentMessage.content?.toolCalls() ?? []
     message.tools = toolCalls.map { call in
       let detail = formatToolDetail(name: call.name, arguments: call.arguments)
-      return ToolUse(kind: toolKind(for: call.name), name: call.name, detail: detail, symbol: toolSymbol(for: call.name))
+      return ToolUse(kind: toolKind(for: call.name), name: call.name, detail: detail, symbol: toolSymbol(for: call.name), callId: call.id)
     }
 
+    // Rehydrate terminal output from persisted toolResult entries (for history reload after restart).
+    var terminalRuns: [TerminalRun] = []
+    var terminalByCallId: [String: TerminalRun] = [:]
+    for call in toolCalls where call.name.lowercased().contains("bash") {
+      guard let callId = call.id, let result = toolResults[callId] else { continue }
+      let command = (call.arguments?["command"]?.value as? String) ?? formatToolDetail(name: call.name, arguments: call.arguments)
+      if command.isEmpty && result.output.isEmpty { continue }
+      let run = TerminalRun(command: command, output: result.output, exitCode: result.isError ? 1 : 0)
+      terminalRuns.append(run)
+      terminalByCallId[callId] = run
+    }
+    message.terminal = terminalRuns
+
     if let built = buildSegments(from: agentMessage.content) {
-      message.segments = built.segments
+      var segments = built.segments
+      // Interleave terminal runs after their tool chip, mirroring live streaming logic.
+      for call in toolCalls.reversed() where call.name.lowercased().contains("bash") {
+        guard let callId = call.id, let run = terminalByCallId[callId] else { continue }
+        if let chipIndex = segments.lastIndex(where: { segment in
+          guard case .tool(let tool) = segment else { return false }
+          return tool.callId == callId
+        }) {
+          segments.insert(.terminal(run), at: chipIndex + 1)
+        } else {
+          segments.append(.terminal(run))
+        }
+      }
+      message.segments = segments
       message.text = built.text
       message.code = built.code
     } else {
       let (textWithoutCode, code) = stripFirstCodeBlock(from: message.text)
       message.code = code
       message.text = textWithoutCode.trimmingCharacters(in: .whitespacesAndNewlines)
+      if !terminalRuns.isEmpty {
+        // Ensure terminal is visible even when there are no text segments.
+        message.segments = terminalRuns.map { .terminal($0) }
+      }
     }
   }
 
