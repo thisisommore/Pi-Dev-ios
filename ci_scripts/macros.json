@@ -1,0 +1,22 @@
+[
+  {
+    "fingerprint" : "de219a1cf34e958134e75a9ebb134cf09bf52fc6",
+    "packageIdentity" : "swift-perception",
+    "targetName" : "PerceptionMacros"
+  },
+  {
+    "fingerprint" : "8a733f414adc1224c5185c3a35c30ee1ef217171",
+    "packageIdentity" : "swift-structured-queries",
+    "targetName" : "StructuredQueriesMacros"
+  },
+  {
+    "fingerprint" : "8a733f414adc1224c5185c3a35c30ee1ef217171",
+    "packageIdentity" : "swift-structured-queries",
+    "targetName" : "StructuredQueriesSQLiteMacros"
+  },
+  {
+    "fingerprint" : "c79f72b3e67a1eb64f66f76704c22ed6a5c1ed84",
+    "packageIdentity" : "swift-dependencies",
+    "targetName" : "DependenciesMacrosPlugin"
+  }
+]
