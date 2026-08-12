@@ -47,7 +47,7 @@ final class ChatMessagesVC: UIViewController {
   init(store: ChatStore) {
     self.store = store
     self.cv = UICollectionView(frame: .zero, collectionViewLayout: ChatMessagesCVLayout())
-    self.cv.contentInset = UIEdgeInsets(top: 8, left: 8, bottom: 28, right: 8)
+    self.cv.contentInset = UIEdgeInsets(top: 68, left: 8, bottom: 28, right: 8)
     super.init(nibName: nil, bundle: nil)
   }
 
@@ -56,7 +56,8 @@ final class ChatMessagesVC: UIViewController {
 
   override func viewDidLoad() {
     super.viewDidLoad()
-    cv.backgroundColor = UIColor.systemBackground
+    cv.backgroundColor = .clear
+    view.backgroundColor = .clear
     cv.delegate = self
     cv.dataSource = self
     cv.register(HostingCell.self, forCellWithReuseIdentifier: HostingCell.reuseID)

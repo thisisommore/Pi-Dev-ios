@@ -48,19 +48,20 @@ struct Header: View {
             }
           }
         } label: {
-          HStack {
-            Text(store.chatTitle)
-              .font(.subheadline.weight(.semibold))
-              .foregroundColor(.primary)
-              .lineLimit(1)
-            Spacer(minLength: 0)
-          }
-          .contentShape(.rect)
+          Text(store.chatTitle)
+            .font(.subheadline.weight(.semibold))
+            .foregroundColor(.primary)
+            .lineLimit(1)
+            .padding(.horizontal, 14)
+            .frame(height: 44)
+            .contentShape(.rect)
         }
         .buttonStyle(.plain)
         .tint(.primary)
         .animation(.linear(duration: 0), value: store.chatTitle)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassEffect(.regular.interactive(), in: .capsule)
+
+        Spacer(minLength: 0)
 
         ContextGauge(
           fraction: store.contextFraction,

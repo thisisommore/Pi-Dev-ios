@@ -43,7 +43,7 @@ private struct ScrollViewFallback: View {
           }
         }
         .padding(.horizontal, 16)
-        .padding(.top, 8)
+        .padding(.top, 68)
         .padding(.bottom, 12)
       }
       .frame(maxHeight: .infinity)

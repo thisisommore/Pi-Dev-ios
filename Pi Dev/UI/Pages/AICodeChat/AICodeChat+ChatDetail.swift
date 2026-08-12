@@ -19,14 +19,18 @@ struct ChatDetailView: View {
     ZStack {
       Background()
 
-      VStack(spacing: 0) {
+      ZStack(alignment: .top) {
+        Background()
+
+        MessageList(store: store)
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+
         Header(
           store: store,
           showModelSheet: $showModelSheet,
           showSidebar: $showSidebar,
           onNewChat: onNewChat
         )
-        MessageList(store: store)
       }
       .contentShape(.rect)
       .onTapGesture {
