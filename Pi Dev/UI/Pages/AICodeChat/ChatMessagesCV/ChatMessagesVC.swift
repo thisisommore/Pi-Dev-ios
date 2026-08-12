@@ -30,6 +30,22 @@ private final class HeaderPassthroughView: UIView {
   }
 }
 
+private final class StatusBarScrimView: UIView {
+  override init(frame: CGRect) {
+    super.init(frame: frame)
+    isUserInteractionEnabled = false
+    backgroundColor = UIColor.systemBackground.withAlphaComponent(0.8)
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) { fatalError() }
+
+  override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+    super.traitCollectionDidChange(previousTraitCollection)
+    backgroundColor = UIColor.systemBackground.withAlphaComponent(0.8)
+  }
+}
+
 final class ChatMessagesVC: UIViewController {
   var store: ChatStore
   private var observationTask: Task<Void, Never>?
@@ -43,6 +59,15 @@ final class ChatMessagesVC: UIViewController {
   private var lastMeasuredWidth: CGFloat = 0
   private var heightCache: [UUID: (signature: Int, height: CGFloat)] = [:]
   private var headerHost: UIHostingController<Header>?
+  private var headerTopConstraint: NSLayoutConstraint?
+  private var statusBarBlurHeight: NSLayoutConstraint?
+  private let headerBand: CGFloat = 60
+
+  private let statusBarBlur: StatusBarScrimView = {
+    let scrim = StatusBarScrimView()
+    scrim.layer.zPosition = 1000
+    return scrim
+  }()
 
   private lazy var scrollToBottomButton: UIButton = {
     let btn = UIButton(type: .system)
@@ -66,7 +91,7 @@ final class ChatMessagesVC: UIViewController {
   init(store: ChatStore) {
     self.store = store
     self.cv = UICollectionView(frame: .zero, collectionViewLayout: ChatMessagesCVLayout())
-    self.cv.contentInset = UIEdgeInsets(top: 68, left: 8, bottom: 28, right: 8)
+    self.cv.contentInset = UIEdgeInsets(top: 60, left: 8, bottom: 28, right: 8)
     super.init(nibName: nil, bundle: nil)
   }
 
@@ -89,6 +114,7 @@ final class ChatMessagesVC: UIViewController {
     cv.alwaysBounceVertical = true
     cv.keyboardDismissMode = .interactive
     cv.clipsToBounds = true
+    view.clipsToBounds = true
     cv.alwaysBounceHorizontal = false
     view.addSubview(cv)
     cv.translatesAutoresizingMaskIntoConstraints = false
@@ -97,6 +123,17 @@ final class ChatMessagesVC: UIViewController {
       cv.leadingAnchor.constraint(equalTo: view.leadingAnchor),
       cv.trailingAnchor.constraint(equalTo: view.trailingAnchor),
       cv.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+    ])
+
+    view.addSubview(statusBarBlur)
+    statusBarBlur.translatesAutoresizingMaskIntoConstraints = false
+    let blurHeight = statusBarBlur.heightAnchor.constraint(equalToConstant: 0)
+    statusBarBlurHeight = blurHeight
+    NSLayoutConstraint.activate([
+      statusBarBlur.topAnchor.constraint(equalTo: view.topAnchor),
+      statusBarBlur.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+      statusBarBlur.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+      blurHeight
     ])
 
     let tap = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
@@ -151,14 +188,18 @@ final class ChatMessagesVC: UIViewController {
     }
     let host = UIHostingController(rootView: header)
     host.view.backgroundColor = .clear
+    host.safeAreaRegions = []
     addChild(host)
     view.addSubview(host.view)
     host.view.translatesAutoresizingMaskIntoConstraints = false
+    let top = host.view.topAnchor.constraint(equalTo: view.topAnchor, constant: view.safeAreaInsets.top)
+    headerTopConstraint = top
     NSLayoutConstraint.activate([
-      host.view.topAnchor.constraint(equalTo: view.topAnchor),
+      top,
       host.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
       host.view.trailingAnchor.constraint(equalTo: view.trailingAnchor)
     ])
+    host.view.layer.zPosition = 1001
     host.didMove(toParent: self)
     headerHost = host
   }
@@ -240,6 +281,7 @@ final class ChatMessagesVC: UIViewController {
 
   override func viewDidLayoutSubviews() {
     super.viewDidLayoutSubviews()
+    updateTopChrome()
     let width = cv.cvAvailableWidth()
     if width > 0, abs(width - lastMeasuredWidth) > 0.5 {
       lastMeasuredWidth = width
@@ -247,6 +289,33 @@ final class ChatMessagesVC: UIViewController {
       cv.collectionViewLayout.invalidateLayout()
     }
     preserveBottomOffset()
+  }
+
+  private var statusBarOverlap: CGFloat {
+    guard let window = view.window else { return 0 }
+    let viewTopInWindow = view.convert(CGPoint.zero, to: window).y
+    return max(0, window.safeAreaInsets.top - viewTopInWindow)
+  }
+
+  private func updateTopChrome() {
+    let overlap = statusBarOverlap
+    let topInset = overlap + headerBand
+    headerTopConstraint?.constant = overlap
+    statusBarBlurHeight?.constant = overlap
+    if abs(cv.contentInset.top - topInset) > 0.5 {
+      var inset = cv.contentInset
+      inset.top = topInset
+      cv.contentInset = inset
+      cv.verticalScrollIndicatorInsets.top = topInset
+    }
+    if let root = view as? HeaderPassthroughView {
+      root.passthroughHeight = topInset
+    }
+    view.bringSubviewToFront(statusBarBlur)
+    if let headerView = headerHost?.view {
+      view.bringSubviewToFront(headerView)
+    }
+    view.bringSubviewToFront(scrollToBottomButton)
   }
 
   override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {

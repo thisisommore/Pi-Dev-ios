@@ -31,6 +31,7 @@ struct ChatDetailView: View {
           showSidebar: $showSidebar,
           onNewChat: onNewChat
         )
+        .safeAreaPadding(.top)
       }
     }
     .safeAreaInset(edge: .bottom, spacing: 0) {

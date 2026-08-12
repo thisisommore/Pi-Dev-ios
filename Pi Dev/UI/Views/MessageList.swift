@@ -25,6 +25,7 @@ struct MessageList: View {
           showModelSheet: $showModelSheet,
           onNewChat: onNewChat
         )
+        .ignoresSafeArea(edges: .top)
         .ignoresSafeArea(.keyboard, edges: .bottom)
       } else {
         // Fallback for older OS — original SwiftUI ScrollView
@@ -51,7 +52,8 @@ private struct ScrollViewFallback: View {
           }
         }
         .padding(.horizontal, 16)
-        .padding(.top, 68)
+        .padding(.top, 60)
+        .safeAreaPadding(.top)
         .padding(.bottom, 12)
       }
       .frame(maxHeight: .infinity)
