@@ -11,10 +11,39 @@ struct AssistantMessage: View {
 
   private var hasContent: Bool {
     !message.text.isEmpty || message.thinking != nil || !message.tools.isEmpty || message.error != nil
+      || !message.segments.isEmpty
   }
 
   private var attributedText: AttributedString {
     markdown(message.text)
+  }
+
+  /// Collapse consecutive tool/terminal segments into disclosure groups so text
+  /// stays in order while tool noise folds under "N tools".
+  private var displaySections: [AssistantDisplaySection] {
+    var sections: [AssistantDisplaySection] = []
+    var pending: [ToolsDisclosure.Item] = []
+
+    func flushActivity() {
+      guard !pending.isEmpty else { return }
+      let id = pending[0].id
+      sections.append(.activity(id: id, items: pending))
+      pending = []
+    }
+
+    for segment in message.segments {
+      switch segment {
+      case .text(let id, let text):
+        flushActivity()
+        sections.append(.text(id: id, text: text))
+      case .tool(let tool):
+        pending.append(.tool(tool))
+      case .terminal(let run):
+        pending.append(.terminal(run))
+      }
+    }
+    flushActivity()
+    return sections
   }
 
   private func markdown(_ string: String) -> AttributedString {
@@ -57,26 +86,30 @@ struct AssistantMessage: View {
         ThinkingBlock(thinking: thinking)
       }
       if !message.segments.isEmpty {
-        ForEach(message.segments) { segment in
-          switch segment {
+        ForEach(displaySections) { section in
+          switch section {
           case .text(_, let text):
             Text(markdown(text))
               .font(.callout)
               .lineSpacing(3)
               .textSelection(.enabled)
-          case .tool(let tool):
-            ToolChip(tool: tool)
-          case .terminal(let run):
-            TerminalBlock(run: run)
+          case .activity(_, let items):
+            ToolsDisclosure(
+              items: items,
+              initiallyExpanded: message.isStreaming
+            )
+            .padding(.top, 2)
+            .padding(.bottom, 2)
           }
         }
       } else {
-        if !message.tools.isEmpty {
-          ToolRow(tools: message.tools)
-            .padding(.top, message.thinking != nil ? 2 : 0)
-        }
-        ForEach(message.terminal) { run in
-          TerminalBlock(run: run)
+        if !message.tools.isEmpty || !message.terminal.isEmpty {
+          ToolsDisclosure(
+            tools: message.tools,
+            terminal: message.terminal,
+            initiallyExpanded: message.isStreaming
+          )
+          .padding(.top, message.thinking != nil ? 2 : 0)
         }
 
         Text(attributedText)
@@ -106,6 +139,17 @@ struct AssistantMessage: View {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(.horizontal, 2)
+  }
+}
+
+private enum AssistantDisplaySection: Identifiable {
+  case text(id: UUID, text: String)
+  case activity(id: UUID, items: [ToolsDisclosure.Item])
+
+  var id: UUID {
+    switch self {
+    case .text(let id, _), .activity(let id, _): return id
+    }
   }
 }
 

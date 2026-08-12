@@ -5,15 +5,94 @@
 
 import SwiftUI
 
+/// Collapsible wrapper for tool calls and terminal runs ("3 tools").
+struct ToolsDisclosure: View {
+  enum Item: Identifiable {
+    case tool(ToolUse)
+    case terminal(TerminalRun)
+
+    var id: UUID {
+      switch self {
+      case .tool(let tool): return tool.id
+      case .terminal(let run): return run.id
+      }
+    }
+  }
+
+  let items: [Item]
+  @State private var expanded: Bool
+
+  init(items: [Item], initiallyExpanded: Bool = false) {
+    self.items = items
+    _expanded = State(initialValue: initiallyExpanded)
+  }
+
+  init(tools: [ToolUse], terminal: [TerminalRun] = [], initiallyExpanded: Bool = false) {
+    self.items = tools.map { .tool($0) } + terminal.map { .terminal($0) }
+    _expanded = State(initialValue: initiallyExpanded)
+  }
+
+  private var title: String {
+    let n = items.count
+    return n == 1 ? "1 tool" : "\(n) tools"
+  }
+
+  var body: some View {
+    if items.isEmpty {
+      EmptyView()
+    } else {
+      VStack(alignment: .leading, spacing: 6) {
+        Button {
+          withAnimation(.snappy) { expanded.toggle() }
+        } label: {
+          HStack(spacing: 8) {
+            Image(systemName: "wrench.and.screwdriver")
+              .font(.system(size: 11, weight: .semibold))
+              .foregroundStyle(.secondary)
+
+            Text(title)
+              .font(.caption.weight(.semibold))
+              .foregroundStyle(.secondary)
+
+            Image(systemName: "chevron.right")
+              .font(.system(size: 9, weight: .bold))
+              .foregroundStyle(.tertiary)
+              .rotationEffect(.degrees(expanded ? 90 : 0))
+
+            Spacer(minLength: 0)
+          }
+          .padding(.horizontal, 12)
+          .padding(.vertical, 10)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .background(.secondary.opacity(0.08), in: .rect(cornerRadius: 12))
+          .contentShape(.rect(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+
+        if expanded {
+          VStack(alignment: .leading, spacing: 6) {
+            ForEach(items) { item in
+              switch item {
+              case .tool(let tool):
+                ToolChip(tool: tool)
+              case .terminal(let run):
+                TerminalBlock(run: run)
+              }
+            }
+          }
+          .padding(.leading, 4)
+          .transition(.opacity.combined(with: .move(edge: .top)))
+        }
+      }
+    }
+  }
+}
+
 struct ToolRow: View {
   let tools: [ToolUse]
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      ForEach(tools) { tool in
-        ToolChip(tool: tool)
-      }
-    }
+    ToolsDisclosure(tools: tools)
   }
 }
 
