@@ -36,6 +36,11 @@ final class ChatStore: Identifiable {
   /// Called as soon as the first token arrives for a new-chat draft, so the
   /// sidebar can appear via RPC without waiting for the full stream.
   var onFirstTokenForNewChat: (() async -> Void)?
+  /// Called when a new-chat draft needs a server session created atomically
+  /// before the first prompt. SidebarStore creates the session via RPC and
+  /// returns the new sessionId. This is the only place new_session is issued
+  /// for a draft, eliminating the newChat/prompt race.
+  var createServerSessionForDraft: (() async -> String?)?
 
   private let rpcClient = PiRPCClient()
 
@@ -710,7 +715,26 @@ final class ChatStore: Identifiable {
       generatingMessageId = nil
       return
     }
-    let streamSessionId = self.cacheSessionId
+    // If this is the first message of a new-chat draft (no session yet),
+    // create the server session atomically before prompting. This is the
+    // only place a draft creates a session, so Send cannot race newChat.
+    var streamSessionId = self.cacheSessionId
+    if streamSessionId == nil, let create = createServerSessionForDraft {
+      if let newId = await create() {
+        streamSessionId = newId
+        // create() already set cacheSessionId and selectedSessionId via
+        // SidebarStore, but ensure local cache is in sync.
+        self.cacheSessionId = newId
+      } else {
+        // Failed to create session — abort and show error.
+        if self.messages.indices.contains(self.messages.count - 1) {
+          // The assistant placeholder was already appended below; mark error.
+        }
+        self.isResponding = false
+        self.generatingMessageId = nil
+        return
+      }
+    }
     let messageIndex = self.messages.count
 
     withAnimation(.snappy) {
@@ -1221,10 +1245,68 @@ final class SidebarStore {
     activeChat.onFirstTokenForNewChat = { [weak self] in
       await self?.handleFirstTokenForNewChat()
     }
+    activeChat.createServerSessionForDraft = { [weak self] in
+      await self?.createServerSessionForDraft()
+    }
     guard connectToServer else { return }
     hydrateFromCache()
     Task { @MainActor in
       await refreshFromServer()
+    }
+  }
+
+  /// Creates a new server session for a draft new-chat. This is the ONLY
+  /// place that issues `new_session` for a draft, so the Send action cannot
+  /// race with a concurrent newChat task. Inserts an optimistic placeholder
+  /// so the sidebar shows instantly (before first token), then refreshes via
+  /// RPC to reconcile with the server's real listing.
+  private func createServerSessionForDraft() async -> String? {
+    // Capture the draft title before we mutate state.
+    let placeholderTitle = activeChat.chatTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+    let titleForPlaceholder = placeholderTitle.isEmpty || placeholderTitle == "New chat"
+      ? (activeChat.messages.first?.text.prefix(34).description ?? "New chat")
+      : placeholderTitle
+    do {
+      _ = try await rpcClient.newSession()
+      let state = try await rpcClient.getState()
+      guard let newId = state.data?.sessionId, !newId.isEmpty,
+            let path = state.data?.sessionFile, !path.isEmpty else { return nil }
+      // Optimistic placeholder — appears instantly in sidebar, even before
+      // the server's session file is listed via GET /sessions.
+      let now = ISO8601DateFormatter().string(from: Date())
+      let placeholder = SessionInfo(
+        path: path,
+        id: newId,
+        cwd: "",
+        name: nil,
+        created: now,
+        modified: now,
+        messageCount: 1,
+        firstMessage: titleForPlaceholder,
+        allMessagesText: titleForPlaceholder
+      )
+      await MainActor.run {
+        // Insert at top; deduplicate if a previous placeholder exists.
+        self.sessions.removeAll { $0.id == newId }
+        self.sessions.insert(placeholder, at: 0)
+        self.selectedSessionId = newId
+        self.activeChat.cacheSessionId = newId
+        self.persistPrefs()
+        PiCache.saveSessions(self.sessions)
+      }
+      // Reconcile with server in background; don't block prompt.
+      Task { @MainActor in
+        await self.loadSessions()
+        // Ensure selection sticks even if server list lags.
+        if self.selectedSessionId != newId {
+          self.selectedSessionId = newId
+          self.activeChat.cacheSessionId = newId
+          self.persistPrefs()
+        }
+      }
+      return newId
+    } catch {
+      return nil
     }
   }
 
@@ -1482,7 +1564,10 @@ final class SidebarStore {
   }
 
   func newChat() async {
-    // Immediately clear sidebar selection so no existing session looks active.
+    // Purely local — no RPC. The server session will be created lazily on
+    // the first prompt for this draft, atomically inside streamReply.
+    // This eliminates the race where Send could fire before newSession
+    // completes and land in the previous session.
     await MainActor.run {
       withAnimation(.snappy) {
         selectedSessionId = nil
@@ -1491,43 +1576,6 @@ final class SidebarStore {
       persistPrefs()
     }
     await activeChat.resetToSession(title: "New chat")
-
-    do {
-      _ = try await rpcClient.newSession()
-      // Try to select the newly created session immediately so the first
-      // prompt is guaranteed to route to the new session even if user
-      // taps Send quickly. This also makes the empty "New chat" appear
-      // in the sidebar right away (avoids "send to previous session" race).
-      do {
-        let state = try await rpcClient.getState()
-        if let newId = state.data?.sessionId, !newId.isEmpty {
-          await MainActor.run {
-            selectedSessionId = newId
-            activeChat.cacheSessionId = newId
-            persistPrefs()
-          }
-          await loadSessions()
-          // Keep selection even if list hasn't yet included the new file.
-          if selectedSessionId != newId {
-            await MainActor.run {
-              selectedSessionId = newId
-              activeChat.cacheSessionId = newId
-              persistPrefs()
-            }
-          }
-          return
-        }
-      } catch {}
-      await loadSessions()
-      // Fallback: stay unselected while composing; server already switched.
-      await MainActor.run {
-        selectedSessionId = nil
-        activeChat.cacheSessionId = nil
-        persistPrefs()
-      }
-    } catch {
-      // UI already shows empty "New chat" with nothing selected.
-    }
   }
 
   func delete(session: SessionInfo) async {
@@ -1564,6 +1612,9 @@ final class SidebarStore {
     }
     activeChat.onFirstTokenForNewChat = { [weak self] in
       await self?.handleFirstTokenForNewChat()
+    }
+    activeChat.createServerSessionForDraft = { [weak self] in
+      await self?.createServerSessionForDraft()
     }
     PiCache.clearAll()
   }
