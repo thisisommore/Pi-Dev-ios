@@ -36,12 +36,6 @@ struct TerminalBlock: View {
         withAnimation(.snappy) { expanded.toggle() }
       } label: {
         HStack(alignment: .top, spacing: 8) {
-          Image(systemName: "terminal")
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(.secondary)
-            .frame(width: 18)
-            .padding(.top, 1)
-
           Text(truncatedCommand.text + (truncatedCommand.hiddenLines > 0 ? "\n…" : ""))
             .font(.system(size: 11, weight: .medium, design: .monospaced))
             .foregroundStyle(.primary)
@@ -50,10 +44,12 @@ struct TerminalBlock: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .textSelection(.enabled)
 
-          Image(systemName: succeeded ? "checkmark.circle.fill" : "xmark.circle.fill")
-            .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(succeeded ? .primary : .secondary)
-            .padding(.top, 1)
+          if !succeeded {
+            Image(systemName: "xmark.circle.fill")
+              .font(.system(size: 12, weight: .semibold))
+              .foregroundStyle(.secondary)
+              .padding(.top, 1)
+          }
 
           Image(systemName: "chevron.down")
             .font(.system(size: 9, weight: .bold))
