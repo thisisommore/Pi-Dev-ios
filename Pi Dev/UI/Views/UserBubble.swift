@@ -43,5 +43,6 @@ struct UserBubble: View {
           }
         }
     }
+    .padding(.top, 12)
   }
 }
