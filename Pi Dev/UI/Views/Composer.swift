@@ -15,12 +15,14 @@ struct Composer: View {
   @State private var showFileImporter = false
   @State private var showClearAlert = false
   @State private var showRepoSheet = false
+  @State private var showExpandSheet = false
   @Environment(\.colorScheme) private var colorScheme
 
   private var hasAttachments: Bool { !store.pastedItems.isEmpty || !store.contextFiles.isEmpty }
   private var canSendMessage: Bool {
     !(store.draft.isEmpty && store.pastedItems.isEmpty && store.contextFiles.isEmpty)
   }
+  private var canExpandDraft: Bool { !store.draft.isEmpty }
 
   var body: some View {
     GlassEffectContainer(spacing: 10) {
@@ -47,6 +49,12 @@ struct Composer: View {
     }
     .sheet(isPresented: $showRepoSheet) {
       RepoPickerSheet(store: store)
+        .presentationDetents([.large])
+        .presentationBackground(.thinMaterial)
+        .presentationCornerRadius(32)
+    }
+    .sheet(isPresented: $showExpandSheet) {
+      ComposerExpandSheet(text: $store.draft)
         .presentationDetents([.large])
         .presentationBackground(.thinMaterial)
         .presentationCornerRadius(32)
@@ -132,32 +140,55 @@ struct Composer: View {
         .scrollClipDisabled()
       }
 
-      TextField(
-        store.editingMessageId != nil ? "Edit message…" : "Ask about your code…",
-        text: $store.draft,
-        prompt: Text(store.editingMessageId != nil ? "Edit message…" : "Ask about your code…").foregroundColor(.gray.opacity(0.7)),
-        axis: .vertical
-      )
-      .lineLimit(1...5)
-      .focused($focused)
-      .font(.callout)
-      // Caret / selection tint (system default is blue).
-      .tint(.primary)
-      .onSubmit {
-        focused = false
-        store.send()
-      }
-      .onChange(of: store.editingMessageId) { _, id in
-        if id != nil { focused = true }
-      }
-      .onChange(of: store.draft) { oldValue, newValue in
-        guard store.editingMessageId == nil else { return }
-        let delta = newValue.count - oldValue.count
-        if delta > 3 && newValue.count > 50 {
-          store.pastedItems.append(PastedItem(content: newValue))
-          store.draft = ""
+      ZStack(alignment: .topTrailing) {
+        TextField(
+          store.editingMessageId != nil ? "Edit message…" : "Ask about your code…",
+          text: $store.draft,
+          prompt: Text(store.editingMessageId != nil ? "Edit message…" : "Ask about your code…").foregroundColor(.gray.opacity(0.7)),
+          axis: .vertical
+        )
+        .lineLimit(1...5)
+        .focused($focused)
+        .font(.callout)
+        // Caret / selection tint (system default is blue).
+        .tint(.primary)
+        .onSubmit {
+          focused = false
+          store.send()
+        }
+        .onChange(of: store.editingMessageId) { _, id in
+          if id != nil { focused = true }
+        }
+        .onChange(of: store.draft) { oldValue, newValue in
+          guard store.editingMessageId == nil else { return }
+          let delta = newValue.count - oldValue.count
+          if delta > 3 && newValue.count > 50 {
+            store.pastedItems.append(PastedItem(content: newValue))
+            store.draft = ""
+          }
+        }
+        // Room for the expand control on the first line.
+        .padding(.trailing, canExpandDraft ? 26 : 0)
+
+        if canExpandDraft {
+          Button {
+            focused = false
+            showExpandSheet = true
+          } label: {
+            Image(systemName: "arrow.up.backward.and.arrow.down.forward")
+              .font(.caption2.weight(.semibold))
+              .foregroundStyle(.tertiary)
+              .frame(width: 20, height: 20)
+              .contentShape(.rect)
+          }
+          // Align with the first line of `.callout` text.
+          .padding(.top, 2)
+          .buttonStyle(.plain)
+          .accessibilityLabel("Expand editor")
+          .transition(.opacity)
         }
       }
+      .animation(.snappy(duration: 0.15), value: canExpandDraft)
       .padding(.top, hasAttachments ? 8 : 14)
       .padding(.horizontal, 14)
 
@@ -318,4 +349,47 @@ struct Composer: View {
     }
   }
 
+}
+
+// MARK: - Expanded multi-line editor
+
+private struct ComposerExpandSheet: View {
+  @Binding var text: String
+  @FocusState private var focused: Bool
+  @Environment(\.dismiss) private var dismiss
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Capsule()
+        .fill(.tertiary)
+        .frame(width: 36, height: 5)
+        .frame(maxWidth: .infinity)
+        .padding(.top, 10)
+
+      HStack {
+        Text("Message")
+          .font(.title3.weight(.bold))
+        Spacer()
+        Button("Done") {
+          focused = false
+          dismiss()
+        }
+        .font(.body.weight(.semibold))
+        .foregroundStyle(.primary)
+      }
+      .padding(.horizontal, 20)
+      .padding(.top, 12)
+      .padding(.bottom, 8)
+
+      TextEditor(text: $text)
+        .font(.body)
+        .scrollContentBackground(.hidden)
+        .tint(.primary)
+        .focused($focused)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+    .onAppear { focused = true }
+  }
 }
