@@ -22,7 +22,6 @@ func appDatabase() throws -> any DatabaseWriter {
     configuration.prepareDatabase { db in
       db.trace(options: .profile) {
         if context == .preview {
-          print($0.expandedDescription)
         } else {
           logger.debug("\($0.expandedDescription)")
         }

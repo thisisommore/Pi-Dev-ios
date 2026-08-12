@@ -577,9 +577,7 @@ final class ChatStore: Identifiable {
       guard let self else { return }
       do {
         _ = try await self.rpcClient.abort()
-        print("[ChatStore] abort sent successfully")
       } catch {
-        print("[ChatStore] abort failed: \(error.localizedDescription)")
       }
       await self.syncStateFromServer()
       await MainActor.run {
@@ -650,7 +648,6 @@ final class ChatStore: Identifiable {
 
   private func streamReply(for userText: String, repo: IncludedRepo? = nil) async {
     if stopRequested {
-      print("[ChatStore] streamReply suppressed due to stopRequested")
       stopRequested = false
       isResponding = false
       generatingMessageId = nil
@@ -658,19 +655,16 @@ final class ChatStore: Identifiable {
     }
     let streamSessionId = self.cacheSessionId
     let messageIndex = self.messages.count
-    print("[ChatStore] streamReply start index=\(messageIndex) session=\(streamSessionId ?? "nil")")
 
     withAnimation(.snappy) {
       self.messages.append(ChatMessage(role: .assistant, text: "", tokens: 0, isStreaming: true))
       self.isResponding = false
     }
-    print("[ChatStore] appended streaming assistant message at index=\(messageIndex)")
     self.generatingMessageId = self.messages[messageIndex].id
 
     do {
       try await rpcClient.setThinkingLevel(thinkingLevel)
     } catch {
-      print("[ChatStore] setThinkingLevel failed: \(error.localizedDescription)")
     }
 
     let userMessageIndex = messageIndex - 1
@@ -682,7 +676,6 @@ final class ChatStore: Identifiable {
           guard let self, let entryId = entryId else { return }
           // Discard entryId for stale session.
           guard self.cacheSessionId == streamSessionId else { return }
-          print("[ChatStore] prompt entryId captured: \(entryId)")
           self.updateMessage(at: userMessageIndex) { $0.entryId = entryId }
         }
       ),
@@ -693,7 +686,6 @@ final class ChatStore: Identifiable {
 
   private func streamRerun(message: String? = nil, entryId: String? = nil, userMessageIndex: Int? = nil) async {
     if stopRequested {
-      print("[ChatStore] streamRerun suppressed due to stopRequested")
       stopRequested = false
       isResponding = false
       generatingMessageId = nil
@@ -701,19 +693,16 @@ final class ChatStore: Identifiable {
     }
     let streamSessionId = self.cacheSessionId
     let messageIndex = self.messages.count
-    print("[ChatStore] streamRerun start index=\(messageIndex) session=\(streamSessionId ?? "nil")")
 
     withAnimation(.snappy) {
       self.messages.append(ChatMessage(role: .assistant, text: "", tokens: 0, isStreaming: true))
       self.isResponding = false
     }
-    print("[ChatStore] appended streaming assistant message at index=\(messageIndex)")
     self.generatingMessageId = self.messages[messageIndex].id
 
     do {
       try await rpcClient.setThinkingLevel(thinkingLevel)
     } catch {
-      print("[ChatStore] setThinkingLevel failed: \(error.localizedDescription)")
     }
 
     await consumeStreamEvents(
@@ -723,7 +712,6 @@ final class ChatStore: Identifiable {
         onEntryId: { [weak self] returnedEntryId in
           guard let self, let userMessageIndex = userMessageIndex, let returnedEntryId = returnedEntryId else { return }
           guard self.cacheSessionId == streamSessionId else { return }
-          print("[ChatStore] rerun entryId captured: \(returnedEntryId)")
           self.updateMessage(at: userMessageIndex) { $0.entryId = returnedEntryId }
         }
       ),
@@ -749,17 +737,13 @@ final class ChatStore: Identifiable {
       }
     }
 
-    print("[ChatStore] entering event loop session=\(expectedSessionId ?? "nil") current=\(self.cacheSessionId ?? "nil")")
     for await event in events {
       // Abort if user switched sessions mid-stream — prevents cross-session pollution.
       if let expectedSessionId, self.cacheSessionId != expectedSessionId {
-        print("[ChatStore] session switched \(expectedSessionId) -> \(self.cacheSessionId ?? "nil"), aborting stream loop")
         rpcClient.cancel()
         break
       }
-      print("[ChatStore] received event: \(event.debugName)")
       guard self.messages.indices.contains(currentIndex) else {
-        print("[ChatStore] message index \(currentIndex) out of range, breaking")
         break
       }
 
@@ -772,7 +756,6 @@ final class ChatStore: Identifiable {
           // If we manually stopped, the server's follow-up abort turn should be ignored
           // to avoid a second empty "Request was aborted." message.
           if stopRequested {
-            print("[ChatStore] ignoring message_start due to manual abort")
             break
           }
           // Each agent turn gets its own assistant message, mirroring how
@@ -797,10 +780,7 @@ final class ChatStore: Identifiable {
       case .messageUpdate(_, let delta):
         switch delta {
         case .textDelta(_, let text):
-          #if DEBUG
-          print("[ChatStore] textDelta: '\(text.prefix(80))'")
-          #endif
-          updateMessage(at: currentIndex) {
+                    updateMessage(at: currentIndex) {
             $0.text += text
             if let lastIndex = $0.segments.indices.last,
                case .text(let segmentId, let existing) = $0.segments[lastIndex] {
@@ -843,7 +823,6 @@ final class ChatStore: Identifiable {
           if let id = call.id { latestToolNames[id] = call.name }
         case .error(let reason):
           if stopRequested && isAbortError(reason) {
-            print("[ChatStore] ignoring abort error delta due to manual stop")
             break
           }
           updateMessage(at: currentIndex) { $0.error = reason }
@@ -873,7 +852,6 @@ final class ChatStore: Identifiable {
         }
 
       case .messageEnd(let message):
-        print("[ChatStore] messageEnd")
         updateThinkingSeconds()
         if message.role == "assistant" {
           finalize(message: message, at: currentIndex)
@@ -881,7 +859,6 @@ final class ChatStore: Identifiable {
         }
 
       case .agentEnd(let messages):
-        print("[ChatStore] agentEnd messages.count=\(messages.count)")
         updateThinkingSeconds()
         if !finalizedCurrentTurn, let last = messages.last(where: { $0.role == "assistant" }) {
           finalize(message: last, at: currentIndex)
@@ -899,7 +876,6 @@ final class ChatStore: Identifiable {
 
       case .extensionError(_, _, let error):
         if stopRequested && isAbortError(error) {
-          print("[ChatStore] ignoring extension abort error due to manual stop")
           break
         }
         updateMessage(at: currentIndex) {
@@ -911,10 +887,8 @@ final class ChatStore: Identifiable {
       }
     }
 
-    print("[ChatStore] event loop ended session=\(expectedSessionId ?? "nil")")
     // If session switched during stream, discard the orphaned assistant message(s).
     if let expectedSessionId, self.cacheSessionId != expectedSessionId {
-      print("[ChatStore] discarding stream for stale session \(expectedSessionId)")
       // Remove any assistant messages appended for the stale stream that are still streaming/empty.
       // The messages were appended at messageIndex; if they are empty, remove them to avoid polluting new session.
       await MainActor.run {
@@ -933,14 +907,11 @@ final class ChatStore: Identifiable {
     }
     self.generatingMessageId = nil
     guard self.messages.indices.contains(currentIndex) else {
-      print("[ChatStore] final check: index \(currentIndex) out of range")
       return
     }
     if self.messages[currentIndex].isStreaming {
-      print("[ChatStore] forcing isStreaming=false at end")
       updateMessage(at: currentIndex) { $0.isStreaming = false }
     }
-    print("[ChatStore] final message text='\(self.messages[currentIndex].text.prefix(80))' streaming=\(self.messages[currentIndex].isStreaming)")
     await syncStateFromServer()
     // Only persist if still the same session.
     if let expectedSessionId, self.cacheSessionId != expectedSessionId { return }
@@ -959,7 +930,6 @@ final class ChatStore: Identifiable {
 
   private func updateMessage(at index: Int, _ update: (inout ChatMessage) -> Void) {
     guard self.messages.indices.contains(index) else {
-      print("[ChatStore] updateMessage index \(index) out of range")
       return
     }
     var message = self.messages[index]
@@ -967,9 +937,7 @@ final class ChatStore: Identifiable {
     update(&message)
     self.messages[index] = message
     if message.text != oldText {
-      print("[ChatStore] updateMessage index=\(index) text changed '\(oldText.prefix(40))' -> '\(message.text.prefix(40))'")
     } else {
-      print("[ChatStore] updateMessage index=\(index) (no text change)")
     }
   }
 
@@ -983,7 +951,6 @@ final class ChatStore: Identifiable {
     let errorText: String? = {
       guard let rawErrorText else { return nil }
       if stopRequested && isAbortError(rawErrorText) {
-        print("[ChatStore] ignoring abort error in finalize due to manual stop")
         return nil
       }
       return rawErrorText

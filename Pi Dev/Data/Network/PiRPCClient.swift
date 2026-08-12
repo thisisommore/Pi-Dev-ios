@@ -108,26 +108,13 @@ final class PiRPCClient {
       request.httpBody = try JSONSerialization.data(withJSONObject: body)
     }
 
-    #if DEBUG
-    print("[PiRPCClient] rerun request: \(rerunURL)")
-    if let message { print("[PiRPCClient] rerun message: \(message.prefix(200))") }
-    if let entryId { print("[PiRPCClient] rerun entryId: \(entryId)") }
-    let payloadString = request.httpBody.flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
-    print("[PiRPCClient] rerun payload: \(payloadString)")
-    #endif
-
+    
     let (data, response) = try await urlSession.data(for: request)
     let responseBody = String(data: data, encoding: .utf8) ?? ""
-    #if DEBUG
-    print("[PiRPCClient] rerun response body: \(responseBody)")
-    #endif
-    guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+        guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
       throw RPCError(command: "rerun", message: "HTTP error: \(responseBody)")
     }
-    #if DEBUG
-    print("[PiRPCClient] rerun response status: \(httpResponse.statusCode)")
-    #endif
-
+    
     let rerunResponse = try? JSONDecoder().decode(RerunResponse.self, from: data)
     return rerunResponse?.entryId
   }
@@ -247,11 +234,9 @@ final class PiRPCClient {
   /// support SSE, falls back to polling `get_last_assistant_text` and
   /// `get_messages` until the agent stops streaming.
   func streamEvents(forPrompt promptText: String, repo: String? = nil, onEntryId: (@MainActor (String?) -> Void)? = nil) -> AsyncStream<AgentEvent> {
-    print("[PiRPCClient] streamEvents start for prompt: \(promptText.prefix(40))")
     let stream = AsyncStream<AgentEvent> { continuation in
       let task = Task { [weak self] in
         guard let self else {
-          print("[PiRPCClient] streamEvents self deallocated, finishing")
           continuation.finish()
           return
         }
@@ -260,21 +245,17 @@ final class PiRPCClient {
         // the prompt request is in flight.
         let sseTask = Task { [weak self] in
           guard let self else {
-            print("[PiRPCClient] readSSE self deallocated")
             return false
           }
           return await self.readSSE(into: continuation)
         }
 
         do {
-          print("[PiRPCClient] sending prompt RPC")
           let response = try await self.prompt(message: promptText, repo: repo)
           if let onEntryId {
             await onEntryId(response.data?.entryId)
           }
-          print("[PiRPCClient] prompt RPC accepted")
         } catch {
-          print("[PiRPCClient] prompt RPC failed: \(error.localizedDescription)")
           sseTask.cancel()
           continuation.yield(.extensionError(extensionPath: "PiRPCClient", event: "prompt", error: error.localizedDescription))
           continuation.finish()
@@ -282,18 +263,14 @@ final class PiRPCClient {
         }
 
         let sseWorked = await sseTask.value
-        print("[PiRPCClient] SSE task returned worked=\(sseWorked)")
         if !sseWorked {
-          print("[PiRPCClient] falling back to polling")
           await self.pollUntilDone(into: continuation)
         }
-        print("[PiRPCClient] finishing stream")
         continuation.finish()
       }
 
       self.setActiveTask(task)
       continuation.onTermination = { @Sendable _ in
-        print("[PiRPCClient] stream terminated, cancelling task")
         task.cancel()
       }
     }
@@ -304,11 +281,9 @@ final class PiRPCClient {
   ///
   /// Uses the same SSE/polling fallback as `streamEvents(forPrompt:)`.
   func streamRerunEvents(message: String? = nil, entryId: String? = nil, onEntryId: (@MainActor (String?) -> Void)? = nil) -> AsyncStream<AgentEvent> {
-    print("[PiRPCClient] streamRerunEvents start")
     let stream = AsyncStream<AgentEvent> { continuation in
       let task = Task { [weak self] in
         guard let self else {
-          print("[PiRPCClient] streamRerunEvents self deallocated, finishing")
           continuation.finish()
           return
         }
@@ -317,21 +292,17 @@ final class PiRPCClient {
         // the rerun request is in flight.
         let sseTask = Task { [weak self] in
           guard let self else {
-            print("[PiRPCClient] readSSE self deallocated")
             return false
           }
           return await self.readSSE(into: continuation)
         }
 
         do {
-          print("[PiRPCClient] sending rerun request")
           let returnedEntryId = try await self.rerun(message: message, entryId: entryId)
           if let onEntryId {
             await onEntryId(returnedEntryId)
           }
-          print("[PiRPCClient] rerun request accepted")
         } catch {
-          print("[PiRPCClient] rerun request failed: \(error.localizedDescription)")
           sseTask.cancel()
           continuation.yield(.extensionError(extensionPath: "PiRPCClient", event: "rerun", error: error.localizedDescription))
           continuation.finish()
@@ -339,18 +310,14 @@ final class PiRPCClient {
         }
 
         let sseWorked = await sseTask.value
-        print("[PiRPCClient] SSE task returned worked=\(sseWorked)")
         if !sseWorked {
-          print("[PiRPCClient] falling back to polling")
           await self.pollUntilDone(into: continuation)
         }
-        print("[PiRPCClient] finishing stream")
         continuation.finish()
       }
 
       self.setActiveTask(task)
       continuation.onTermination = { @Sendable _ in
-        print("[PiRPCClient] stream terminated, cancelling task")
         task.cancel()
       }
     }
@@ -362,16 +329,13 @@ final class PiRPCClient {
     var request = URLRequest(url: eventsURL)
     request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
     configureAuth(for: &request)
-    print("[PiRPCClient] readSSE connecting to \(eventsURL)")
 
     do {
       let (bytes, response) = try await urlSession.bytes(for: request)
       guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
         let status = (response as? HTTPURLResponse)?.statusCode ?? -1
-        print("[PiRPCClient] readSSE non-success status: \(status)")
         return false
       }
-      print("[PiRPCClient] readSSE connected (status \((response as? HTTPURLResponse)?.statusCode ?? -1))")
 
       var dataLines: [String] = []
       var eventName: String?
@@ -385,19 +349,15 @@ final class PiRPCClient {
           return
         }
         let payload = dataLines.joined(separator: "\n")
-        print("[PiRPCClient] readSSE parsed event='\(eventName ?? "")' payload=\(payload.prefix(200))")
         if eventName == "pi",
            let data = payload.data(using: .utf8),
            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
            let event = AgentEvent(json: json) {
-          print("[PiRPCClient] readSSE yielding event: \(event.debugName)")
           continuation.yield(event)
           if case .agentEnd = event {
-            print("[PiRPCClient] readSSE agent_end received, closing SSE reader")
             shouldStop = true
           }
         } else {
-          print("[PiRPCClient] readSSE dropped payload (event='\(eventName ?? "")', parse failed)")
         }
         dataLines = []
         eventName = nil
@@ -406,10 +366,8 @@ final class PiRPCClient {
       for try await line in bytes.lines {
         lineCount += 1
         if lineCount <= 10 || lineCount % 20 == 0 {
-          print("[PiRPCClient] readSSE line #\(lineCount): '\(line.prefix(120))'")
         }
         if Task.isCancelled {
-          print("[PiRPCClient] readSSE cancelled after \(lineCount) lines")
           return true
         }
 
@@ -427,10 +385,8 @@ final class PiRPCClient {
         }
       }
       flushPendingEvent()
-      print("[PiRPCClient] readSSE stream ended after \(lineCount) lines")
       return true
     } catch {
-      print("[PiRPCClient] readSSE error: \(error.localizedDescription)")
       return false
     }
   }
