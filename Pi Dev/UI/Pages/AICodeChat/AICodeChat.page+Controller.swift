@@ -27,6 +27,9 @@ final class ChatStore: Identifiable {
   var messageQueue: [String] = []
   /// Session id used when writing chat cache (owned by SidebarStore).
   var cacheSessionId: String? = nil
+  /// Called when the first turn of a new (previously unselected) chat commits on the server.
+  /// SidebarStore sets this to adopt the new sessionId and refresh the list.
+  var onNewSessionAdopted: ((String) -> Void)?
 
   private let rpcClient = PiRPCClient()
 
@@ -975,6 +978,25 @@ final class ChatStore: Identifiable {
       updateMessage(at: currentIndex) { $0.isStreaming = false }
     }
     await syncStateFromServer()
+    // First turn of a new chat: server now has a sessionId — adopt it so
+    // sidebar shows the new chat immediately without requiring reload.
+    if expectedSessionId == nil {
+      do {
+        let state = try await rpcClient.getState()
+        if let newId = state.data?.sessionId, !newId.isEmpty {
+          let shouldAdopt: Bool = await MainActor.run {
+            if self.cacheSessionId == nil {
+              self.cacheSessionId = newId
+              return true
+            }
+            return false
+          }
+          if shouldAdopt {
+            await MainActor.run { self.onNewSessionAdopted?(newId) }
+          }
+        }
+      } catch {}
+    }
     // Only persist if still the same session.
     if let expectedSessionId, self.cacheSessionId != expectedSessionId { return }
     persistChatCache()
@@ -1175,11 +1197,32 @@ final class SidebarStore {
   /// - Parameter connectToServer: When `false`, skip RPC bootstrap (previews / offline mocks).
   init(connectToServer: Bool = true) {
     activeChat = ChatStore(connectToServer: connectToServer)
+    activeChat.onNewSessionAdopted = { [weak self] newId in
+      Task { @MainActor in
+        await self?.adoptNewChatSession(newId)
+      }
+    }
     guard connectToServer else { return }
     hydrateFromCache()
     Task { @MainActor in
       await refreshFromServer()
     }
+  }
+
+  /// Adopt the server-assigned sessionId for the first turn of a previously
+  /// unselected new chat, then refresh the sidebar list.
+  private func adoptNewChatSession(_ sessionId: String) async {
+    guard !sessionId.isEmpty else { return }
+    // If already selected (e.g. user switched during stream), ignore.
+    if let selected = selectedSessionId, selected == sessionId { return }
+    // Only adopt when we were in the "New chat" (unselected) state.
+    guard selectedSessionId == nil else { return }
+    selectedSessionId = sessionId
+    activeChat.cacheSessionId = sessionId
+    persistPrefs()
+    await loadSessions()
+    // Ensure the new chat is cached under the correct id.
+    activeChat.persistChatCache(sessionId: sessionId)
   }
 
   /// Sidebar pre-filled with mock sessions and an active canned chat.
@@ -1423,6 +1466,11 @@ final class SidebarStore {
     selectedSessionId = nil
     searchText = ""
     activeChat = ChatStore(connectToServer: false)
+    activeChat.onNewSessionAdopted = { [weak self] newId in
+      Task { @MainActor in
+        await self?.adoptNewChatSession(newId)
+      }
+    }
     PiCache.clearAll()
   }
 

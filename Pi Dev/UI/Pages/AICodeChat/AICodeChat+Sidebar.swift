@@ -43,11 +43,45 @@ struct Sidebar: View {
 
         ScrollView {
           LazyVStack(spacing: 0) {
+            // Optimistic draft for new chat: show immediately after first message
+            // before server has returned the new sessionId. Replaced by real
+            // entry once adoptNewChatSession loads sessions.
+            if store.selectedSessionId == nil, !store.activeChat.messages.isEmpty {
+              Button {} label: {
+                HStack(spacing: 10) {
+                  VStack(alignment: .leading, spacing: 2) {
+                    Text(store.activeChat.chatTitle)
+                      .font(.subheadline.weight(.regular))
+                      .lineLimit(1)
+                      .frame(maxWidth: .infinity, alignment: .leading)
+                  }
+                  Circle()
+                    .fill(.primary)
+                    .frame(width: 6, height: 6)
+                }
+                .frame(maxWidth: .infinity)
+                .contentShape(.rect)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+              }
+              .buttonStyle(.plain)
+              .background {
+                Color.clear
+                  .glassEffect(.regular, in: .rect(cornerRadius: 12))
+              }
+              Divider()
+                .opacity(0.5)
+                .padding(.horizontal, 14)
+                .padding(.top, 4)
+            }
             if store.filteredSessions.isEmpty {
-              Text("No sessions")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, minHeight: 80)
+              // Keep placeholder only when there is no draft either.
+              if store.selectedSessionId != nil || store.activeChat.messages.isEmpty {
+                Text("No sessions")
+                  .font(.subheadline)
+                  .foregroundStyle(.secondary)
+                  .frame(maxWidth: .infinity, minHeight: 80)
+              }
             } else {
               ForEach(store.groupedSessions, id: \.day) { group in
                 Text(store.sectionTitle(for: group.day))
