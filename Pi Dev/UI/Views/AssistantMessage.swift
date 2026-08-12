@@ -277,7 +277,7 @@ struct AssistantMessage: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(.horizontal, 2)
+    .padding(.horizontal, 12)
   }
 }
 

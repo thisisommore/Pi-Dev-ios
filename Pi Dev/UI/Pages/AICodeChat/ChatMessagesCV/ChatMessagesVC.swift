@@ -88,7 +88,7 @@ final class ChatMessagesVC: UIViewController {
   private var headerHost: UIHostingController<Header>?
   private var headerTopConstraint: NSLayoutConstraint?
   private var statusBarBlurHeight: NSLayoutConstraint?
-  private let headerBand: CGFloat = 60
+  private let headerBand: CGFloat = 72
   private let statusBarFadeExtra: CGFloat = 100
 
   private let statusBarBlur: StatusBarScrimView = {
@@ -119,7 +119,7 @@ final class ChatMessagesVC: UIViewController {
   init(store: ChatStore) {
     self.store = store
     self.cv = UICollectionView(frame: .zero, collectionViewLayout: ChatMessagesCVLayout())
-    self.cv.contentInset = UIEdgeInsets(top: 60, left: 8, bottom: 28, right: 8)
+    self.cv.contentInset = UIEdgeInsets(top: 72, left: 16, bottom: 40, right: 16)
     super.init(nibName: nil, bundle: nil)
   }
 

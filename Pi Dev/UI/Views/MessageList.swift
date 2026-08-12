@@ -51,10 +51,10 @@ private struct ScrollViewFallback: View {
             TypingIndicator(tint: appColor).id("typing")
           }
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 60)
+        .padding(.horizontal, 20)
+        .padding(.top, 72)
         .safeAreaPadding(.top)
-        .padding(.bottom, 12)
+        .padding(.bottom, 20)
       }
       .frame(maxHeight: .infinity)
       .scrollDismissesKeyboard(.interactively)
