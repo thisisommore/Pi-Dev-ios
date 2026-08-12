@@ -568,8 +568,9 @@ final class ChatStore: Identifiable {
 
 
   private func streamReply(for userText: String, repo: IncludedRepo? = nil) async {
+    let streamSessionId = self.cacheSessionId
     let messageIndex = self.messages.count
-    print("[ChatStore] streamReply start index=\(messageIndex)")
+    print("[ChatStore] streamReply start index=\(messageIndex) session=\(streamSessionId ?? "nil")")
 
     withAnimation(.snappy) {
       self.messages.append(ChatMessage(role: .assistant, text: "", tokens: 0, isStreaming: true))
@@ -591,17 +592,21 @@ final class ChatStore: Identifiable {
         repo: repo?.url,
         onEntryId: { [weak self] entryId in
           guard let self, let entryId = entryId else { return }
+          // Discard entryId for stale session.
+          guard self.cacheSessionId == streamSessionId else { return }
           print("[ChatStore] prompt entryId captured: \(entryId)")
           self.updateMessage(at: userMessageIndex) { $0.entryId = entryId }
         }
       ),
-      at: messageIndex
+      at: messageIndex,
+      expectedSessionId: streamSessionId
     )
   }
 
   private func streamRerun(message: String? = nil, entryId: String? = nil, userMessageIndex: Int? = nil) async {
+    let streamSessionId = self.cacheSessionId
     let messageIndex = self.messages.count
-    print("[ChatStore] streamRerun start index=\(messageIndex)")
+    print("[ChatStore] streamRerun start index=\(messageIndex) session=\(streamSessionId ?? "nil")")
 
     withAnimation(.snappy) {
       self.messages.append(ChatMessage(role: .assistant, text: "", tokens: 0, isStreaming: true))
@@ -622,15 +627,17 @@ final class ChatStore: Identifiable {
         entryId: entryId,
         onEntryId: { [weak self] returnedEntryId in
           guard let self, let userMessageIndex = userMessageIndex, let returnedEntryId = returnedEntryId else { return }
+          guard self.cacheSessionId == streamSessionId else { return }
           print("[ChatStore] rerun entryId captured: \(returnedEntryId)")
           self.updateMessage(at: userMessageIndex) { $0.entryId = returnedEntryId }
         }
       ),
-      at: messageIndex
+      at: messageIndex,
+      expectedSessionId: streamSessionId
     )
   }
 
-  private func consumeStreamEvents(_ events: AsyncStream<AgentEvent>, at messageIndex: Int) async {
+  private func consumeStreamEvents(_ events: AsyncStream<AgentEvent>, at messageIndex: Int, expectedSessionId: String? = nil) async {
     var latestToolNames: [String: String] = [:]
     var thinkingStartTime: Date?
     var currentIndex = messageIndex
@@ -647,8 +654,14 @@ final class ChatStore: Identifiable {
       }
     }
 
-    print("[ChatStore] entering event loop")
+    print("[ChatStore] entering event loop session=\(expectedSessionId ?? "nil") current=\(self.cacheSessionId ?? "nil")")
     for await event in events {
+      // Abort if user switched sessions mid-stream — prevents cross-session pollution.
+      if let expectedSessionId, self.cacheSessionId != expectedSessionId {
+        print("[ChatStore] session switched \(expectedSessionId) -> \(self.cacheSessionId ?? "nil"), aborting stream loop")
+        rpcClient.cancel()
+        break
+      }
       print("[ChatStore] received event: \(event.debugName)")
       guard self.messages.indices.contains(currentIndex) else {
         print("[ChatStore] message index \(currentIndex) out of range, breaking")
@@ -787,7 +800,26 @@ final class ChatStore: Identifiable {
       }
     }
 
-    print("[ChatStore] event loop ended")
+    print("[ChatStore] event loop ended session=\(expectedSessionId ?? "nil")")
+    // If session switched during stream, discard the orphaned assistant message(s).
+    if let expectedSessionId, self.cacheSessionId != expectedSessionId {
+      print("[ChatStore] discarding stream for stale session \(expectedSessionId)")
+      // Remove any assistant messages appended for the stale stream that are still streaming/empty.
+      // The messages were appended at messageIndex; if they are empty, remove them to avoid polluting new session.
+      await MainActor.run {
+        // Remove trailing empty streaming messages for the stale session.
+        while let last = self.messages.last, last.isStreaming && last.text.isEmpty && last.tools.isEmpty {
+          self.messages.removeLast()
+        }
+        // Also handle the original messageIndex if it’s still streaming empty.
+        if self.messages.indices.contains(messageIndex), self.messages[messageIndex].isStreaming, self.messages[messageIndex].text.isEmpty {
+          self.messages.remove(at: messageIndex)
+        }
+        self.generatingMessageId = nil
+        self.isResponding = false
+      }
+      return
+    }
     self.generatingMessageId = nil
     guard self.messages.indices.contains(currentIndex) else {
       print("[ChatStore] final check: index \(currentIndex) out of range")
@@ -799,13 +831,17 @@ final class ChatStore: Identifiable {
     }
     print("[ChatStore] final message text='\(self.messages[currentIndex].text.prefix(80))' streaming=\(self.messages[currentIndex].isStreaming)")
     await syncStateFromServer()
+    // Only persist if still the same session.
+    if let expectedSessionId, self.cacheSessionId != expectedSessionId { return }
     persistChatCache()
     // The server generates the session title asynchronously after a run;
     // refresh once more shortly after to pick it up.
+    let persistSession = expectedSessionId ?? self.cacheSessionId
     Task { @MainActor [weak self] in
       try? await Task.sleep(for: .seconds(10))
-      await self?.syncStateFromServer()
-      self?.persistChatCache()
+      guard let self, self.cacheSessionId == persistSession else { return }
+      await self.syncStateFromServer()
+      self.persistChatCache()
     }
     processQueue()
   }
@@ -1114,6 +1150,7 @@ final class SidebarStore {
   }
 
   func loadSessions() async {
+    // Capture refresh id to discard stale results if sessions reloaded concurrently.
     do {
       let sessions = try await rpcClient.listSessions()
       let sorted = sessions.sorted { $0.modified > $1.modified }
@@ -1127,6 +1164,11 @@ final class SidebarStore {
         if let selected = self.selectedSessionId,
            !sorted.contains(where: { $0.id == selected }) {
           self.selectedSessionId = nil
+          // Also clear activeChat title to avoid showing stale title for deleted session.
+          if activeChat.cacheSessionId == selected {
+            activeChat.chatTitle = "New chat"
+            activeChat.cacheSessionId = nil
+          }
         }
         PiCache.saveSessions(sorted)
         self.persistPrefs()

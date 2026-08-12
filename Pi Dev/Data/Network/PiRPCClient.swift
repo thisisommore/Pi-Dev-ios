@@ -27,7 +27,17 @@ final class PiRPCClient {
   private static func configuredBaseURL() -> URL {
     let stored = UserDefaults.standard.string(forKey: "piServerBaseURL")
     let raw = stored?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-    if let url = URL(string: raw), !raw.isEmpty {
+    // Normalize bare hostnames like "pi.sh.ommore.xyz" → https://...
+    let normalized: String = {
+      if raw.isEmpty { return raw }
+      if raw.hasPrefix("http://") || raw.hasPrefix("https://") { return raw }
+      return "https://" + raw
+    }()
+    if let url = URL(string: normalized), !normalized.isEmpty, url.host != nil {
+      return url
+    }
+    // Fall back to raw if it at least parses (legacy), else localhost.
+    if let url = URL(string: raw), !raw.isEmpty, url.host != nil {
       return url
     }
     return URL(string: "http://localhost:3000")!
@@ -37,8 +47,16 @@ final class PiRPCClient {
     UserDefaults.standard.string(forKey: "piAuthToken")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
   }
 
+  /// Current values from UserDefaults (not the snapshot at init) — use for
+  /// per-request auth/host to handle server switch without app restart.
+  private var currentBaseURL: URL { Self.configuredBaseURL() }
+  private var currentAuthToken: String { Self.configuredAuthToken() }
+
   private func configureAuth(for request: inout URLRequest) {
-    if !authToken.isEmpty {
+    let token = currentAuthToken.isEmpty ? authToken : currentAuthToken
+    if !token.isEmpty {
+      request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    } else if !authToken.isEmpty {
       request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
     }
   }
@@ -48,12 +66,24 @@ final class PiRPCClient {
   }
 
   private func setActiveTask(_ task: Task<Void, Never>?) {
-    lock.withLock { activeTask = task }
+    // Cancel previous streaming task before overwriting — prevents two
+    // concurrent streams fighting over the same SSE connection and
+    // polluting each other's AsyncStream.
+    let previous: Task<Void, Never>? = lock.withLock {
+      let prev = activeTask
+      activeTask = task
+      return prev
+    }
+    previous?.cancel()
   }
 
   private func cancelActiveTask() {
-    lock.withLock { activeTask }?.cancel()
-    lock.withLock { activeTask = nil }
+    let task: Task<Void, Never>? = lock.withLock {
+      let t = activeTask
+      activeTask = nil
+      return t
+    }
+    task?.cancel()
   }
 
   // MARK: - Typed commands
@@ -65,7 +95,7 @@ final class PiRPCClient {
   }
 
   func rerun(message: String? = nil, entryId: String? = nil) async throws -> String? {
-    let rerunURL = baseURL.appendingPathComponent("rerun")
+    let rerunURL = currentBaseURL.appendingPathComponent("rerun")
     var request = URLRequest(url: rerunURL)
     request.httpMethod = "POST"
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -153,7 +183,7 @@ final class PiRPCClient {
   // MARK: - Session REST endpoints
 
   func listSessions() async throws -> [SessionInfo] {
-    let sessionsURL = baseURL.appendingPathComponent("sessions")
+    let sessionsURL = currentBaseURL.appendingPathComponent("sessions")
     var request = URLRequest(url: sessionsURL)
     request.httpMethod = "GET"
     configureAuth(for: &request)
@@ -179,7 +209,7 @@ final class PiRPCClient {
   // MARK: - Generic request
 
   func send<T: Decodable>(command: [String: Any]) async throws -> RPCResponse<T> {
-    let rpcURL = baseURL.appendingPathComponent("rpc")
+    let rpcURL = currentBaseURL.appendingPathComponent("rpc")
     var request = URLRequest(url: rpcURL)
     request.httpMethod = "POST"
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -318,7 +348,7 @@ final class PiRPCClient {
   }
 
   private func readSSE(into continuation: AsyncStream<AgentEvent>.Continuation) async -> Bool {
-    let eventsURL = baseURL.appendingPathComponent("events")
+    let eventsURL = currentBaseURL.appendingPathComponent("events")
     var request = URLRequest(url: eventsURL)
     request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
     configureAuth(for: &request)
