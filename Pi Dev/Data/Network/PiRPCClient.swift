@@ -49,7 +49,12 @@ final class PiRPCClient {
 
   /// Current values from UserDefaults (not the snapshot at init) — use for
   /// per-request auth/host to handle server switch without app restart.
-  private var currentBaseURL: URL { Self.configuredBaseURL() }
+  /// For Setup healthCheck, fall back to the init baseURL when UserDefaults is still empty (pre-save).
+  private var currentBaseURL: URL {
+    let stored = UserDefaults.standard.string(forKey: "piServerBaseURL")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    if stored.isEmpty { return baseURL }
+    return Self.configuredBaseURL()
+  }
   private var currentAuthToken: String { Self.configuredAuthToken() }
 
   private func configureAuth(for request: inout URLRequest) {
