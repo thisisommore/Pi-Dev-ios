@@ -6,8 +6,17 @@
 import SwiftUI
 
 struct AICodeChatView: View {
-  @State private var sidebarStore = SidebarStore()
+  @State private var sidebarStore: SidebarStore
   @State private var showSidebar = false
+
+  init() {
+    // Default arg evaluation is nonisolated; construct on the MainActor here instead.
+    _sidebarStore = State(initialValue: SidebarStore())
+  }
+
+  init(sidebarStore: SidebarStore) {
+    _sidebarStore = State(initialValue: sidebarStore)
+  }
 
   var body: some View {
     GeometryReader { geometry in
@@ -50,7 +59,12 @@ struct AICodeChatView: View {
   }
 }
 
-#Preview {
-  AICodeChatView()
+#Preview("Dark") {
+  AICodeChatView(sidebarStore: .preview)
     .preferredColorScheme(.dark)
+}
+
+#Preview("Light") {
+  AICodeChatView(sidebarStore: .preview)
+    .preferredColorScheme(.light)
 }

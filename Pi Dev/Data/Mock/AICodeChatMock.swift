@@ -18,8 +18,66 @@ enum AICodeChatMock {
     "Unit tests for auth"
   ]
 
+  static let models: [AgentModel] = [
+    AgentModel(
+      id: "claude-opus-4-6",
+      name: "Opus 4.6",
+      provider: "anthropic",
+      contextWindow: 500_000,
+      thinkingLevelMap: nil
+    ),
+    AgentModel(
+      id: "claude-sonnet-4-6",
+      name: "Sonnet 4.6",
+      provider: "anthropic",
+      contextWindow: 200_000,
+      thinkingLevelMap: nil
+    ),
+    AgentModel(
+      id: "claude-haiku-4-5",
+      name: "Haiku 4.5",
+      provider: "anthropic",
+      contextWindow: 200_000,
+      thinkingLevelMap: nil
+    ),
+  ]
+
+  /// Fully populated sidebar + active chat for SwiftUI previews.
+  static func seed(into sidebar: SidebarStore) {
+    let iso = ISO8601DateFormatter()
+    let now = Date()
+    let yesterday = now.addingTimeInterval(-86_400)
+    let lastWeek = now.addingTimeInterval(-86_400 * 5)
+
+    sidebar.sessions = chatTitles.enumerated().map { index, title in
+      let stamp: Date =
+        index < 3 ? now
+        : index < 6 ? yesterday
+        : lastWeek
+      let date = iso.string(from: stamp)
+      return SessionInfo(
+        path: "/mock/sessions/\(index)",
+        id: "mock-session-\(index)",
+        cwd: "/Users/dev/PiDevApp",
+        name: title,
+        created: date,
+        modified: date,
+        messageCount: index == 0 ? 2 : (index % 7) + 1,
+        firstMessage: title,
+        allMessagesText: title
+      )
+    }
+    sidebar.selectedSessionId = sidebar.sessions.first?.id
+    sidebar.searchText = ""
+    seed(into: sidebar.activeChat)
+  }
+
   static func seed(into store: ChatStore) {
     store.chatTitle = "Debounce repo search"
+    store.availableModels = models
+    store.selectedModel = models[1]
+    store.thinkingLevel = .high
+    store.supportedThinkingLevels = ThinkingLevel.defaultLevels
     store.messages = [
       ChatMessage(
         role: .user,
@@ -29,6 +87,9 @@ enum AICodeChatMock {
       cannedReply(level: .high)
     ]
     store.usedTokens = 46_800
+    store.draft = ""
+    store.isResponding = false
+    store.messageQueue = []
   }
 
   static func cannedReply(level: ThinkingLevel) -> ChatMessage {

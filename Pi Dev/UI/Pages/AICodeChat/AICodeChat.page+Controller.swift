@@ -38,7 +38,9 @@ final class ChatStore: Identifiable {
     messageQueue.enumerated().reversed().map { QueuedMessage(id: $0.offset, text: $0.element) }
   }
 
-  init() {
+  /// - Parameter connectToServer: When `false`, skip RPC bootstrap (previews / offline mocks).
+  init(connectToServer: Bool = true) {
+    guard connectToServer else { return }
     Task { @MainActor in
       await loadAvailableModels()
     }
@@ -769,16 +771,27 @@ final class ChatStore: Identifiable {
 final class SidebarStore {
   var sessions: [SessionInfo] = []
   var selectedSessionId: String? = nil
-  var activeChat = ChatStore()
+  var activeChat: ChatStore
   var searchText = ""
 
   private let rpcClient = PiRPCClient()
 
-  init() {
+  /// - Parameter connectToServer: When `false`, skip RPC bootstrap (previews / offline mocks).
+  init(connectToServer: Bool = true) {
+    activeChat = ChatStore(connectToServer: connectToServer)
+    guard connectToServer else { return }
     Task { @MainActor in
       await loadSessions()
       await syncActiveSession()
     }
+  }
+
+  /// Sidebar pre-filled with mock sessions and an active canned chat.
+  @MainActor
+  static var preview: SidebarStore {
+    let store = SidebarStore(connectToServer: false)
+    AICodeChatMock.seed(into: store)
+    return store
   }
 
   var filteredSessions: [SessionInfo] {
