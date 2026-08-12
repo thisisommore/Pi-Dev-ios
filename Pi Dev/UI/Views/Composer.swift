@@ -141,6 +141,8 @@ struct Composer: View {
       .lineLimit(1...5)
       .focused($focused)
       .font(.callout)
+      // Caret / selection tint (system default is blue).
+      .tint(.primary)
       .onSubmit {
         focused = false
         store.send()
