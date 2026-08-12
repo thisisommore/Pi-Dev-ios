@@ -253,7 +253,7 @@ struct AgentState: Decodable, Sendable {
   let pendingMessageCount: Int?
 }
 
-struct AgentModel: Decodable, Sendable {
+struct AgentModel: Decodable, Sendable, Equatable {
   let id: String
   let name: String
   let provider: String?

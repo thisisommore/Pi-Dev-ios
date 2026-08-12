@@ -89,12 +89,13 @@ final class ChatStore: Identifiable {
     do {
       let response = try await rpcClient.getAvailableModels()
       if let models = response.data?.models, !models.isEmpty {
-        withAnimation(.snappy) {
+        // Background refresh: no animation; skip assign when unchanged.
+        if self.availableModels != models {
           self.availableModels = models
-          if self.selectedModel == nil
-              || !models.contains(where: { $0.id == self.selectedModel?.id }) {
-            self.selectedModel = models.first
-          }
+        }
+        if self.selectedModel == nil
+            || !models.contains(where: { $0.id == self.selectedModel?.id }) {
+          self.selectedModel = models.first
         }
         PiCache.saveModels(models)
         PiCache.saveLastModelId(selectedModel?.id)
@@ -163,26 +164,33 @@ final class ChatStore: Identifiable {
   }
 
   private func apply(state: AgentState) {
-    if let model = state.model {
+    if let model = state.model, selectedModel != model {
       self.selectedModel = model
     }
     if let levelString = state.thinkingLevel {
-      self.thinkingLevel = ThinkingLevel(id: levelString)
+      let level = ThinkingLevel(id: levelString)
+      if thinkingLevel != level {
+        self.thinkingLevel = level
+      }
     }
-    if let name = state.sessionName?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
+    if let name = state.sessionName?.trimmingCharacters(in: .whitespacesAndNewlines),
+       !name.isEmpty,
+       chatTitle != name {
       self.chatTitle = name
     }
-    self.supportedThinkingLevels = self.buildSupportedThinkingLevels(from: state.model?.thinkingLevelMap)
+    let levels = self.buildSupportedThinkingLevels(from: state.model?.thinkingLevelMap)
+    if supportedThinkingLevels.map(\.id) != levels.map(\.id) {
+      self.supportedThinkingLevels = levels
+    }
   }
 
   private func syncStateFromServer() async {
     do {
       let state = try await rpcClient.getState()
       await MainActor.run {
-        withAnimation(.snappy) {
-          if let stateData = state.data {
-            self.apply(state: stateData)
-          }
+        // No animation — state sync runs on refresh and after streams.
+        if let stateData = state.data {
+          self.apply(state: stateData)
         }
       }
     } catch {
@@ -214,13 +222,18 @@ final class ChatStore: Identifiable {
       }
 
       let state = try await rpcClient.getState()
+      let tokens = chatMessages.reduce(0) { $0 + $1.tokens }
       await MainActor.run {
-        withAnimation(.snappy) {
+        // Background revalidate: only replace when content actually differs.
+        // Avoids ForEach re-insert animations from fresh UUIDs on every load.
+        if !ChatMessage.contentMatches(self.messages, chatMessages) {
           self.messages = chatMessages
-          self.usedTokens = chatMessages.reduce(0) { $0 + $1.tokens }
-          if let stateData = state.data {
-            self.apply(state: stateData)
-          }
+        }
+        if self.usedTokens != tokens {
+          self.usedTokens = tokens
+        }
+        if let stateData = state.data {
+          self.apply(state: stateData)
         }
         if let sessionId {
           self.persistChatCache(sessionId: sessionId)
@@ -962,16 +975,19 @@ final class SidebarStore {
       let sessions = try await rpcClient.listSessions()
       let sorted = sessions.sorted { $0.modified > $1.modified }
       await MainActor.run {
-        withAnimation(.snappy) {
+        // No animation on refresh — only mutate when the list actually changed.
+        if self.sessions != sorted {
           self.sessions = sorted
-          if let selected = self.selectedSessionId,
-             sorted.contains(where: { $0.id == selected }) {
-            // Keep the previously selected (or cached) session.
-          } else if let first = sorted.first {
+        }
+        if let selected = self.selectedSessionId,
+           sorted.contains(where: { $0.id == selected }) {
+          // Keep the previously selected (or cached) session.
+        } else if let first = sorted.first {
+          if self.selectedSessionId != first.id {
             self.selectedSessionId = first.id
-          } else {
-            self.selectedSessionId = nil
           }
+        } else if self.selectedSessionId != nil {
+          self.selectedSessionId = nil
         }
         PiCache.saveSessions(sorted)
         self.persistPrefs()

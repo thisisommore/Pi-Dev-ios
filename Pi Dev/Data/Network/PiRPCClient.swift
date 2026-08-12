@@ -475,7 +475,7 @@ struct SessionsResponse: Decodable, Sendable {
   let sessions: [SessionInfo]
 }
 
-struct SessionInfo: Identifiable, Decodable, Sendable {
+struct SessionInfo: Identifiable, Decodable, Sendable, Equatable {
   let path: String
   let id: String
   let cwd: String
