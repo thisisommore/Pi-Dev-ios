@@ -5,6 +5,10 @@
 
 import Foundation
 
+/// Legacy local model catalogue — not used at runtime.
+/// The app now uses `AgentModel` decoded from the server (`get_available_models`
+/// / `get_state`). Kept for previews / docs only.
+@available(*, deprecated, message: "Use AgentModel from server instead")
 enum AIModel: String, CaseIterable, Identifiable {
   case fable = "Fable 5"
   case opus = "Opus 4.8"

@@ -108,19 +108,25 @@ final class PiRPCClient {
       request.httpBody = try JSONSerialization.data(withJSONObject: body)
     }
 
+    #if DEBUG
     print("[PiRPCClient] rerun request: \(rerunURL)")
     if let message { print("[PiRPCClient] rerun message: \(message.prefix(200))") }
     if let entryId { print("[PiRPCClient] rerun entryId: \(entryId)") }
     let payloadString = request.httpBody.flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
     print("[PiRPCClient] rerun payload: \(payloadString)")
+    #endif
 
     let (data, response) = try await urlSession.data(for: request)
     let responseBody = String(data: data, encoding: .utf8) ?? ""
+    #if DEBUG
     print("[PiRPCClient] rerun response body: \(responseBody)")
+    #endif
     guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
       throw RPCError(command: "rerun", message: "HTTP error: \(responseBody)")
     }
+    #if DEBUG
     print("[PiRPCClient] rerun response status: \(httpResponse.statusCode)")
+    #endif
 
     let rerunResponse = try? JSONDecoder().decode(RerunResponse.self, from: data)
     return rerunResponse?.entryId

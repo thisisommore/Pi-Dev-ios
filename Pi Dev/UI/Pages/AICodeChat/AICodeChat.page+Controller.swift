@@ -714,7 +714,9 @@ final class ChatStore: Identifiable {
       case .messageUpdate(_, let delta):
         switch delta {
         case .textDelta(_, let text):
+          #if DEBUG
           print("[ChatStore] textDelta: '\(text.prefix(80))'")
+          #endif
           updateMessage(at: currentIndex) {
             $0.text += text
             if let lastIndex = $0.segments.indices.last,
