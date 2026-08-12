@@ -24,6 +24,8 @@ final class ChatStore: Identifiable {
   var contextFiles: [ContextFile] = []
   var includedRepo: IncludedRepo? = nil
   var messageQueue: [String] = []
+  /// Session id used when writing chat cache (owned by SidebarStore).
+  var cacheSessionId: String? = nil
 
   private let rpcClient = PiRPCClient()
 
@@ -41,8 +43,45 @@ final class ChatStore: Identifiable {
   /// - Parameter connectToServer: When `false`, skip RPC bootstrap (previews / offline mocks).
   init(connectToServer: Bool = true) {
     guard connectToServer else { return }
+    // Models hydrate via SidebarStore.bootstrap; still refresh in background.
     Task { @MainActor in
       await loadAvailableModels()
+    }
+  }
+
+  /// Apply a cached chat snapshot immediately (no network).
+  func applyCachedSnapshot(_ snapshot: CachedChatSnapshot, models: [AgentModel] = [], preferredModelId: String? = nil) {
+    messages = snapshot.messages
+    usedTokens = snapshot.usedTokens
+    chatTitle = snapshot.title
+    thinkingLevel = ThinkingLevel(id: snapshot.thinkingLevel)
+    isResponding = false
+    draft = ""
+    editingMessageId = nil
+    pastedItems = []
+    contextFiles = []
+    includedRepo = nil
+    messageQueue = []
+    generatingMessageId = nil
+
+    if !models.isEmpty {
+      availableModels = models
+    }
+    let modelId = preferredModelId ?? snapshot.selectedModelId
+    if let modelId, let match = availableModels.first(where: { $0.id == modelId }) {
+      selectedModel = match
+    } else if selectedModel == nil {
+      selectedModel = availableModels.first
+    }
+  }
+
+  func applyCachedModels(_ models: [AgentModel], preferredModelId: String? = nil) {
+    guard !models.isEmpty else { return }
+    availableModels = models
+    if let preferredModelId, let match = models.first(where: { $0.id == preferredModelId }) {
+      selectedModel = match
+    } else if selectedModel == nil || !models.contains(where: { $0.id == selectedModel?.id }) {
+      selectedModel = models.first
     }
   }
 
@@ -52,13 +91,16 @@ final class ChatStore: Identifiable {
       if let models = response.data?.models, !models.isEmpty {
         withAnimation(.snappy) {
           self.availableModels = models
-          if self.selectedModel == nil {
+          if self.selectedModel == nil
+              || !models.contains(where: { $0.id == self.selectedModel?.id }) {
             self.selectedModel = models.first
           }
         }
+        PiCache.saveModels(models)
+        PiCache.saveLastModelId(selectedModel?.id)
       }
     } catch {
-      // Server may not expose this command; leave the list empty.
+      // Keep cached models if the server is unreachable.
     }
   }
 
@@ -68,11 +110,13 @@ final class ChatStore: Identifiable {
       await MainActor.run {
         withAnimation(.snappy) { self.selectedModel = model }
       }
+      PiCache.saveLastModelId(model.id)
       await syncStateFromServer()
     } catch {
       await MainActor.run {
         withAnimation(.snappy) { self.selectedModel = model }
       }
+      PiCache.saveLastModelId(model.id)
     }
   }
 
@@ -146,7 +190,10 @@ final class ChatStore: Identifiable {
     }
   }
 
-  func loadMessages() async {
+  /// Loads messages from the server and replaces the in-memory list.
+  /// On failure, existing (cached) messages are left untouched.
+  /// - Parameter sessionId: When set, persists the loaded transcript under this session.
+  func loadMessages(sessionId: String? = nil) async {
     do {
       let response = try await rpcClient.getEntries()
       guard let entries = response.data?.entries else { return }
@@ -175,10 +222,26 @@ final class ChatStore: Identifiable {
             self.apply(state: stateData)
           }
         }
+        if let sessionId {
+          self.persistChatCache(sessionId: sessionId)
+        }
       }
     } catch {
-      // Leave messages empty if the server is unreachable.
+      // Keep cached / existing messages if the server is unreachable.
     }
+  }
+
+  func persistChatCache(sessionId: String? = nil) {
+    let id = sessionId ?? cacheSessionId
+    guard let id, !id.isEmpty, !isStreaming else { return }
+    PiCache.saveChat(
+      sessionId: id,
+      title: chatTitle,
+      usedTokens: usedTokens,
+      selectedModelId: selectedModel?.id,
+      thinkingLevel: thinkingLevel,
+      messages: messages
+    )
   }
 
   private func populate(message: inout ChatMessage, from agentMessage: AgentMessage) {
@@ -591,11 +654,13 @@ final class ChatStore: Identifiable {
     }
     print("[ChatStore] final message text='\(self.messages[currentIndex].text.prefix(80))' streaming=\(self.messages[currentIndex].isStreaming)")
     await syncStateFromServer()
+    persistChatCache()
     // The server generates the session title asynchronously after a run;
     // refresh once more shortly after to pick it up.
     Task { @MainActor [weak self] in
       try? await Task.sleep(for: .seconds(10))
       await self?.syncStateFromServer()
+      self?.persistChatCache()
     }
     processQueue()
   }
@@ -773,6 +838,8 @@ final class SidebarStore {
   var selectedSessionId: String? = nil
   var activeChat: ChatStore
   var searchText = ""
+  /// True while a background network revalidation is in flight.
+  var isRefreshing = false
 
   private let rpcClient = PiRPCClient()
 
@@ -780,9 +847,9 @@ final class SidebarStore {
   init(connectToServer: Bool = true) {
     activeChat = ChatStore(connectToServer: connectToServer)
     guard connectToServer else { return }
+    hydrateFromCache()
     Task { @MainActor in
-      await loadSessions()
-      await syncActiveSession()
+      await refreshFromServer()
     }
   }
 
@@ -792,6 +859,50 @@ final class SidebarStore {
     let store = SidebarStore(connectToServer: false)
     AICodeChatMock.seed(into: store)
     return store
+  }
+
+  /// Paint last-known sidebar, models, and open chat before any network call.
+  private func hydrateFromCache() {
+    guard let bootstrap = PiCache.loadBootstrap() else { return }
+    if !bootstrap.sessions.isEmpty {
+      sessions = bootstrap.sessions
+    }
+    selectedSessionId = bootstrap.lastSessionId ?? sessions.first?.id
+    activeChat.cacheSessionId = selectedSessionId
+
+    activeChat.applyCachedModels(
+      bootstrap.models,
+      preferredModelId: bootstrap.lastModelId
+    )
+
+    if let chat = bootstrap.chat {
+      activeChat.applyCachedSnapshot(
+        chat,
+        models: bootstrap.models,
+        preferredModelId: bootstrap.lastModelId
+      )
+    } else if let session = sessions.first(where: { $0.id == selectedSessionId }) {
+      activeChat.chatTitle = sessionTitle(session)
+    }
+  }
+
+  /// Revalidate sessions, models, and the open chat from the server.
+  /// Cached UI stays visible until each piece succeeds.
+  private func refreshFromServer() async {
+    isRefreshing = true
+    defer { isRefreshing = false }
+
+    await loadSessions()
+    await activeChat.loadAvailableModels()
+    await syncActiveSession(clearBeforeLoad: false)
+    persistPrefs()
+  }
+
+  private func persistPrefs() {
+    PiCache.savePrefs(
+      lastSessionId: selectedSessionId,
+      lastModelId: activeChat.selectedModel?.id
+    )
   }
 
   var filteredSessions: [SessionInfo] {
@@ -849,16 +960,24 @@ final class SidebarStore {
   func loadSessions() async {
     do {
       let sessions = try await rpcClient.listSessions()
+      let sorted = sessions.sorted { $0.modified > $1.modified }
       await MainActor.run {
         withAnimation(.snappy) {
-          self.sessions = sessions.sorted { $0.modified > $1.modified }
-          if self.selectedSessionId == nil, let first = sessions.first {
+          self.sessions = sorted
+          if let selected = self.selectedSessionId,
+             sorted.contains(where: { $0.id == selected }) {
+            // Keep the previously selected (or cached) session.
+          } else if let first = sorted.first {
             self.selectedSessionId = first.id
+          } else {
+            self.selectedSessionId = nil
           }
         }
+        PiCache.saveSessions(sorted)
+        self.persistPrefs()
       }
     } catch {
-      // Leave the list empty if the server is unreachable.
+      // Keep cached sessions if the server is unreachable.
     }
   }
 
@@ -867,14 +986,33 @@ final class SidebarStore {
 
     await MainActor.run {
       withAnimation(.snappy) { selectedSessionId = session.id }
+      activeChat.cacheSessionId = session.id
+      persistPrefs()
+
+      // Instant paint from cache when available.
+      if let cached = PiCache.loadChat(sessionId: session.id) {
+        activeChat.applyCachedSnapshot(cached)
+      } else {
+        // No cache — clear to the new title while network loads.
+        activeChat.messages = []
+        activeChat.usedTokens = 0
+        activeChat.chatTitle = sessionTitle(session)
+        activeChat.isResponding = false
+        activeChat.draft = ""
+        activeChat.editingMessageId = nil
+        activeChat.pastedItems = []
+        activeChat.contextFiles = []
+        activeChat.includedRepo = nil
+        activeChat.messageQueue = []
+      }
     }
 
     do {
       _ = try await rpcClient.switchSession(path: session.path)
-      await activeChat.resetToSession(title: sessionTitle(session))
-      await activeChat.loadMessages()
+      await activeChat.loadMessages(sessionId: session.id)
+      persistPrefs()
     } catch {
-      await activeChat.resetToSession(title: sessionTitle(session))
+      // Keep whatever we showed (cache or empty shell).
     }
   }
 
@@ -885,6 +1023,7 @@ final class SidebarStore {
       await loadSessions()
       await MainActor.run {
         withAnimation(.snappy) { selectedSessionId = sessions.first?.id }
+        persistPrefs()
       }
     } catch {
       await activeChat.resetToSession(title: "New chat")
@@ -902,6 +1041,8 @@ final class SidebarStore {
           selectedSessionId = sessions.first?.id
         }
       }
+      PiCache.saveSessions(sessions)
+      persistPrefs()
     }
     if wasSelected, let next = sessions.first {
       await select(session: next)
@@ -912,12 +1053,25 @@ final class SidebarStore {
     sessions.removeAll()
     selectedSessionId = nil
     searchText = ""
-    activeChat = ChatStore()
+    activeChat = ChatStore(connectToServer: false)
+    PiCache.clearAll()
   }
 
-  private func syncActiveSession() async {
+  /// - Parameter clearBeforeLoad: When `true`, wipe the chat before fetching (legacy).
+  ///   Launch refresh uses `false` so cached messages stay visible until RPC returns.
+  private func syncActiveSession(clearBeforeLoad: Bool = true) async {
     guard let session = sessions.first(where: { $0.id == selectedSessionId }) else { return }
-    await activeChat.resetToSession(title: sessionTitle(session))
-    await activeChat.loadMessages()
+    activeChat.cacheSessionId = session.id
+    if clearBeforeLoad {
+      await activeChat.resetToSession(title: sessionTitle(session))
+    } else if activeChat.chatTitle == "New chat" || activeChat.chatTitle.isEmpty {
+      activeChat.chatTitle = sessionTitle(session)
+    }
+    do {
+      _ = try await rpcClient.switchSession(path: session.path)
+    } catch {
+      // Still attempt get_entries; switch may not be required if already active.
+    }
+    await activeChat.loadMessages(sessionId: session.id)
   }
 }
