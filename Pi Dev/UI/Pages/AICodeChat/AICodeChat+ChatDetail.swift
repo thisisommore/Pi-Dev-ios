@@ -34,7 +34,7 @@ struct ChatDetailView: View {
         dismissKeyboard()
       }
     }
-    .safeAreaInset(edge: .bottom) {
+    .safeAreaInset(edge: .bottom, spacing: 0) {
       VStack(alignment: .leading, spacing: 0) {
         if store.editingMessageId != nil {
           Button {

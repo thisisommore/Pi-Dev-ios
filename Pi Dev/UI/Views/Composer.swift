@@ -75,7 +75,7 @@ struct Composer: View {
               }
             }
           }
-          .padding(.horizontal, 34)
+          .padding(.horizontal, 14)
         }
 
         inputCard
@@ -160,20 +160,25 @@ struct Composer: View {
       .padding(.horizontal, 14)
 
       toolbar
+        // Keep controls above the home indicator.
+        .padding(.bottom, 4)
     }
-    .background(
-      colorScheme == .dark
-        ? AnyShapeStyle(.ultraThickMaterial)
-        : AnyShapeStyle(.white),
-      in: .rect(cornerRadius: 26)
-    )
-    .overlay(
-      RoundedRectangle(cornerRadius: 26)
-        .stroke(.secondary.opacity(colorScheme == .dark ? 0.25 : 0.15), lineWidth: 0.5)
-    )
+    // Full-bleed dock: flush to all edges, no corner radius.
+    .background {
+      Rectangle()
+        .fill(
+          colorScheme == .dark
+            ? AnyShapeStyle(.ultraThickMaterial)
+            : AnyShapeStyle(.white)
+        )
+        .ignoresSafeArea(edges: .bottom)
+        .overlay(alignment: .top) {
+          Rectangle()
+            .fill(.secondary.opacity(colorScheme == .dark ? 0.25 : 0.15))
+            .frame(height: 0.5)
+        }
+    }
     .compositingGroup()
-    .padding(.horizontal, 16)
-    .padding(.bottom, 8)
   }
 
   private var toolbar: some View {
