@@ -117,7 +117,7 @@ struct ModelRow: View {
         if store.selectedModel?.id == model.id {
           Image(systemName: "checkmark")
             .font(.system(size: 14, weight: .bold))
-            .foregroundStyle(.primary)
+            .foregroundStyle(appLabel)
         }
       }
       .padding(.horizontal, 20)

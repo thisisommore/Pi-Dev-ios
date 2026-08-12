@@ -28,6 +28,7 @@ struct Pi_DevApp: App {
                     AICodeChatView()
                 }
             }
+            .foregroundStyle(appLabel)
         }
     }
 }

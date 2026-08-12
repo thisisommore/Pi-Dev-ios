@@ -170,7 +170,7 @@ struct Composer: View {
       VStack(alignment: .leading, spacing: 1) {
         Text(cmd.invocation)
           .font(.subheadline.weight(.semibold))
-          .foregroundStyle(.primary)
+          .foregroundStyle(appLabel)
           .lineLimit(1)
         if let desc = cmd.description, !desc.isEmpty {
           Text(desc)
@@ -364,7 +364,7 @@ struct Composer: View {
       } label: {
         Image(systemName: "plus")
           .font(.system(size: 16, weight: .semibold))
-          .foregroundStyle(.primary)
+          .foregroundStyle(appLabel)
           .frame(width: 40, height: 40)
       }
       .buttonStyle(.plain)
@@ -435,7 +435,7 @@ struct Composer: View {
             .multilineTextAlignment(.leading)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .foregroundStyle(.primary)
+        .foregroundStyle(appLabel)
       }
       .buttonStyle(.plain)
 
@@ -498,7 +498,7 @@ private struct ComposerExpandSheet: View {
           dismiss()
         }
         .font(.body.weight(.semibold))
-        .foregroundStyle(.primary)
+        .foregroundStyle(appLabel)
       }
       .padding(.horizontal, 20)
       .padding(.top, 12)

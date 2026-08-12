@@ -50,7 +50,7 @@ struct Header: View {
         } label: {
           Text(store.chatTitle)
             .font(.subheadline.weight(.semibold))
-            .foregroundColor(.primary)
+            .foregroundStyle(appLabel)
             .lineLimit(1)
             .padding(.horizontal, 14)
             .frame(height: 44)
@@ -85,6 +85,7 @@ struct Header: View {
       .padding(.top, 6)
       .padding(.bottom, 10)
     }
+    .foregroundStyle(appLabel)
     .blur(radius: store.editingMessageId != nil ? 10 : 0)
     .allowsHitTesting(store.editingMessageId == nil)
     .animation(.snappy, value: store.editingMessageId != nil)

@@ -410,7 +410,7 @@ private struct ErrorBlock: View {
         .textSelection(.enabled)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .foregroundStyle(.primary)
+    .foregroundStyle(appLabel)
     .padding(10)
     .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
     .padding(.top, 4)

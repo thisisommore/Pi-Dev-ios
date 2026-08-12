@@ -22,6 +22,13 @@ let appColor = Color(uiColor: UIColor { traits in
     : UIColor(red: 0.035, green: 0.035, blue: 0.043, alpha: 1) // #09090b
 })
 
+/// Body text / icons — slightly off-black in light, off-white in dark.
+let appLabel = Color(uiColor: UIColor { traits in
+  traits.userInterfaceStyle == .dark
+    ? UIColor(white: 0.90, alpha: 1)
+    : UIColor(white: 0.14, alpha: 1)
+})
+
 /// Text / icons painted on solid ink fills.
 let appOnInk = Color(uiColor: UIColor { traits in
   traits.userInterfaceStyle == .dark

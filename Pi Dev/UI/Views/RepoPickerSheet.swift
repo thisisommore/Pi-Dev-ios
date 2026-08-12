@@ -145,7 +145,7 @@ struct RepoPickerSheet: View {
                 VStack(alignment: .leading, spacing: 2) {
                   Text(repo.fullName)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(appLabel)
                   if let description = repo.description, !description.isEmpty {
                     Text(description)
                       .font(.caption2)

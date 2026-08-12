@@ -232,7 +232,7 @@ struct SetupView: View {
     HStack(spacing: 8) {
       Text(text)
         .font(.system(compact ? .caption2 : .caption, design: .monospaced))
-        .foregroundStyle(.primary)
+        .foregroundStyle(appLabel)
         .lineLimit(1)
         .minimumScaleFactor(0.7)
         .truncationMode(.middle)

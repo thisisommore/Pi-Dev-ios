@@ -38,7 +38,7 @@ struct TerminalBlock: View {
         HStack(alignment: .top, spacing: 8) {
           Text(truncatedCommand.text + (truncatedCommand.hiddenLines > 0 ? "\n…" : ""))
             .font(.system(size: 11, weight: .medium, design: .monospaced))
-            .foregroundStyle(.primary)
+            .foregroundStyle(appLabel)
             .lineLimit(expanded ? Self.maxCommandLines + 1 : 1)
             .multilineTextAlignment(.leading)
             .frame(maxWidth: .infinity, alignment: .leading)
