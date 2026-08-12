@@ -196,12 +196,31 @@ enum AICodeChatMock {
         Test Suite 'SearchViewModelTests' started
           ✔ debouncesRapidTyping (0.31s)
           ✔ fallsBackToCacheOffline (0.08s)
+          ✘ cancelsInFlightOnNewQuery (0.12s)
+            Issue recorded: Expected results.count == 1, but was 3
           ✔ clearsResultsOnEmptyQuery (0.04s)
           ✔ normalizesCacheKey (0.05s)
-        Executed 6 tests, 0 failures
+        Executed 5 tests, with 1 failure in 0.612 seconds
         """,
-        exitCode: 0
-      )
+        exitCode: 1
+      ),
+      TerminalRun(
+        command: "xcrun simctl boot \"iPhone 16\"",
+        output: """
+        An error was encountered processing the command (domain=NSPOSIXErrorDomain, code=60):
+        Unable to boot device in current state: Booted
+        """,
+        exitCode: 60
+      ),
+      TerminalRun(
+        command: "swift package resolve",
+        output: """
+        error: root manifest not found
+        error: terminated(1): /usr/bin/xcrun --sdk macosx --find swift-package output:
+         xcrun: error: unable to find utility "swift-package", not a developer tool or in PATH
+        """,
+        exitCode: 1
+      ),
     ]
 
     return reply

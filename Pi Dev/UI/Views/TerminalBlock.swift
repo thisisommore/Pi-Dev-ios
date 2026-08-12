@@ -45,8 +45,8 @@ struct TerminalBlock: View {
             .textSelection(.enabled)
 
           if !succeeded {
-            Image(systemName: "xmark.circle.fill")
-              .font(.system(size: 12, weight: .semibold))
+            Text("exit \(run.exitCode)")
+              .font(.system(size: 10, weight: .semibold, design: .monospaced))
               .foregroundStyle(.secondary)
               .padding(.top, 1)
           }
@@ -83,18 +83,6 @@ struct TerminalBlock: View {
             .foregroundStyle(.tertiary)
             .padding(.horizontal, 12)
             .padding(.bottom, 10)
-        }
-
-        if !succeeded {
-          HStack(spacing: 4) {
-            Image(systemName: "exclamationmark.triangle.fill")
-              .font(.system(size: 9))
-            Text("exit \(run.exitCode)")
-              .font(.system(size: 10, weight: .semibold, design: .monospaced))
-          }
-          .foregroundStyle(.secondary)
-          .padding(.horizontal, 12)
-          .padding(.bottom, 10)
         }
       }
     }
