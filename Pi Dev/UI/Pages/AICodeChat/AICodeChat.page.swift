@@ -3,8 +3,8 @@
 //  Pi Dev
 //
 
-import SQLiteData
 import SwiftUI
+import Combine
 
 struct AICodeChatView: View {
   @State private var sidebarStore: SidebarStore
@@ -61,17 +61,15 @@ struct AICodeChatView: View {
 }
 
 #Preview("Dark") {
-  let _ = prepareDependencies {
-    $0.defaultDatabase = try! appDatabase()
+  Mock {
+    AICodeChatView(sidebarStore: PreviewUtils.sidebarStore())
   }
-  AICodeChatView(sidebarStore: .preview)
-    .preferredColorScheme(.dark)
+  .preferredColorScheme(.dark)
 }
 
 #Preview("Light") {
-  let _ = prepareDependencies {
-    $0.defaultDatabase = try! appDatabase()
+  Mock {
+    AICodeChatView(sidebarStore: PreviewUtils.sidebarStore())
   }
-  AICodeChatView(sidebarStore: .preview)
-    .preferredColorScheme(.light)
+  .preferredColorScheme(.light)
 }

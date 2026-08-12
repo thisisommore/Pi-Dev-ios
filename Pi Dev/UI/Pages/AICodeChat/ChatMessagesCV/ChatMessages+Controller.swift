@@ -1,90 +1,22 @@
 //
-//  ChatMessagesVC.swift
+//  ChatMessages+Controller.swift
 //  Pi Dev
-//
-//  Custom UICollectionView-based chat list — ported from Haven's
-//  ChatMessages+Controller.swift (iOS 17.2) and adapted for ChatStore/ChatMessage.
-//  Uses Haven's ChatMessagesCVLayout (per-item align + vertical stack) and
-//  measures SwiftUI rows at the collection width so text wraps instead of
-//  overflowing. Composer/keyboard insets are owned by SwiftUI.
 //
 
 import SwiftUI
 import UIKit
 
-/// Collection view is a full-screen UIKit representable. Hit-test the SwiftUI
-/// header (and other non-list subviews) first; pass the header band through
-/// so an overlay header can still receive taps.
-private final class HeaderPassthroughView: UIView {
-  var passthroughHeight: CGFloat = 68
-  override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-    guard isUserInteractionEnabled, !isHidden, alpha > 0.01 else { return nil }
-    for subview in subviews.reversed() where !(subview is UICollectionView) {
-      let converted = subview.convert(point, from: self)
-      if let hit = subview.hitTest(converted, with: event) {
-        return hit
-      }
-    }
-    if point.y < passthroughHeight { return nil }
-    return super.hitTest(point, with: event)
-  }
-}
-
-private final class StatusBarScrimView: UIView {
-  private let gradient = CAGradientLayer()
-
-  override init(frame: CGRect) {
-    super.init(frame: frame)
-    isUserInteractionEnabled = false
-    backgroundColor = .clear
-    gradient.colors = Self.colors
-    gradient.startPoint = CGPoint(x: 0.5, y: 0)
-    gradient.endPoint = CGPoint(x: 0.5, y: 1)
-    layer.addSublayer(gradient)
-  }
-
-  @available(*, unavailable)
-  required init?(coder: NSCoder) { fatalError() }
-
-  override func layoutSubviews() {
-    super.layoutSubviews()
-    gradient.frame = bounds
-  }
-
-  override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
-    super.traitCollectionDidChange(previousTraitCollection)
-    gradient.colors = Self.colors
-  }
-
-  func setHoldThenFade(holdHeight: CGFloat, fadeHeight: CGFloat) {
-    let total = holdHeight + fadeHeight
-    guard total > 0 else { return }
-    let holdEnd = holdHeight / total
-    gradient.locations = [0, NSNumber(value: holdEnd), 1]
-  }
-
-  private static var colors: [CGColor] {
-    let solid = UIColor.systemBackground.withAlphaComponent(0.8).cgColor
-    return [
-      solid,
-      solid,
-      UIColor.systemBackground.withAlphaComponent(0).cgColor
-    ]
-  }
-}
-
 final class ChatMessagesVC: UIViewController {
   var store: ChatStore
   private var observationTask: Task<Void, Never>?
   var items: [ChatCVItem] = []
-  var itemsCountForLayout: Int { items.count }
-  func itemForLayout(at index: Int) -> ChatCVItem { items[index] }
+  var itemsCountForLayout: Int { self.items.count }
 
-  private(set) var isNearBottom: Bool = true
+  var isNearBottom: Bool = true
   var tempButtonDisable = true
   private var previousViewSize: CGFloat = 0
   private var lastMeasuredWidth: CGFloat = 0
-  private var heightCache: [UUID: (signature: Int, height: CGFloat)] = [:]
+  var heightCache: [UUID: (signature: Int, height: CGFloat)] = [:]
   private var headerHost: UIHostingController<Header>?
   private var headerTopConstraint: NSLayoutConstraint?
   private var statusBarBlurHeight: NSLayoutConstraint?
@@ -97,7 +29,7 @@ final class ChatMessagesVC: UIViewController {
     return scrim
   }()
 
-  private lazy var scrollToBottomButton: UIButton = {
+  lazy var scrollToBottomButton: UIButton = {
     let btn = UIButton(type: .system)
     let config = UIImage.SymbolConfiguration(pointSize: 16, weight: .light)
     let image = UIImage(systemName: "chevron.down", withConfiguration: config)
@@ -126,6 +58,8 @@ final class ChatMessagesVC: UIViewController {
   @available(*, unavailable)
   required init?(coder _: NSCoder) { fatalError() }
 
+  func itemForLayout(at index: Int) -> ChatCVItem { self.items[index] }
+
   override func loadView() {
     let root = HeaderPassthroughView()
     root.backgroundColor = .clear
@@ -134,52 +68,65 @@ final class ChatMessagesVC: UIViewController {
 
   override func viewDidLoad() {
     super.viewDidLoad()
-    cv.backgroundColor = .clear
-    view.backgroundColor = .clear
-    cv.delegate = self
-    cv.dataSource = self
-    cv.register(HostingCell.self, forCellWithReuseIdentifier: HostingCell.reuseID)
-    cv.alwaysBounceVertical = true
-    cv.keyboardDismissMode = .interactive
-    cv.clipsToBounds = true
-    view.clipsToBounds = true
-    cv.alwaysBounceHorizontal = false
-    view.addSubview(cv)
-    cv.translatesAutoresizingMaskIntoConstraints = false
+    self.makeUI()
+    self.startObservation()
+    self.applySnapshot(animated: false)
+  }
+
+  func makeUI() {
+    self.cv.backgroundColor = .clear
+    self.view.backgroundColor = .clear
+    self.cv.delegate = self
+    self.cv.dataSource = self
+    self.cv.register(HostingCell.self, forCellWithReuseIdentifier: HostingCell.reuseID)
+    self.cv.alwaysBounceVertical = true
+    self.cv.keyboardDismissMode = .interactive
+    self.cv.clipsToBounds = true
+    self.view.clipsToBounds = true
+    self.cv.alwaysBounceHorizontal = false
+    self.view.addSubview(self.cv)
+    self.cv.translatesAutoresizingMaskIntoConstraints = false
     NSLayoutConstraint.activate([
-      cv.topAnchor.constraint(equalTo: view.topAnchor),
-      cv.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-      cv.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-      cv.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+      self.cv.topAnchor.constraint(equalTo: self.view.topAnchor),
+      self.cv.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
+      self.cv.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
+      self.cv.bottomAnchor.constraint(equalTo: self.view.bottomAnchor)
     ])
 
-    view.addSubview(statusBarBlur)
-    statusBarBlur.translatesAutoresizingMaskIntoConstraints = false
-    let blurHeight = statusBarBlur.heightAnchor.constraint(equalToConstant: 0)
-    statusBarBlurHeight = blurHeight
+    self.view.addSubview(self.statusBarBlur)
+    self.statusBarBlur.translatesAutoresizingMaskIntoConstraints = false
+    let blurHeight = self.statusBarBlur.heightAnchor.constraint(equalToConstant: 0)
+    self.statusBarBlurHeight = blurHeight
     NSLayoutConstraint.activate([
-      statusBarBlur.topAnchor.constraint(equalTo: view.topAnchor),
-      statusBarBlur.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-      statusBarBlur.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+      self.statusBarBlur.topAnchor.constraint(equalTo: self.view.topAnchor),
+      self.statusBarBlur.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
+      self.statusBarBlur.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
       blurHeight
     ])
 
-    let tap = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
+    let tap = UITapGestureRecognizer(target: self, action: #selector(self.dismissKeyboard))
     tap.cancelsTouchesInView = false
-    cv.addGestureRecognizer(tap)
+    self.cv.addGestureRecognizer(tap)
 
-    view.addSubview(scrollToBottomButton)
-    scrollToBottomButton.translatesAutoresizingMaskIntoConstraints = false
+    self.view.addSubview(self.scrollToBottomButton)
+    self.scrollToBottomButton.translatesAutoresizingMaskIntoConstraints = false
     NSLayoutConstraint.activate([
-      scrollToBottomButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-      scrollToBottomButton.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -20),
-      scrollToBottomButton.widthAnchor.constraint(equalToConstant: 40),
-      scrollToBottomButton.heightAnchor.constraint(equalToConstant: 40)
+      self.scrollToBottomButton.trailingAnchor.constraint(equalTo: self.view.trailingAnchor, constant: -20),
+      self.scrollToBottomButton.bottomAnchor.constraint(equalTo: self.view.bottomAnchor, constant: -20),
+      self.scrollToBottomButton.widthAnchor.constraint(equalToConstant: 40),
+      self.scrollToBottomButton.heightAnchor.constraint(equalToConstant: 40)
     ])
 
-    NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillHide), name: UIResponder.keyboardWillHideNotification, object: nil)
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(self.keyboardWillHide),
+      name: UIResponder.keyboardWillHideNotification,
+      object: nil
+    )
+  }
 
-    observationTask = Task { @MainActor [weak self] in
+  func startObservation() {
+    self.observationTask = Task { @MainActor [weak self] in
       guard let self else { return }
       var lastCount = self.store.messages.count
       var lastTyping = self.store.isResponding
@@ -204,8 +151,6 @@ final class ChatMessagesVC: UIViewController {
         }
       }
     }
-
-    applySnapshot(animated: false)
   }
 
   func installHeader(_ header: Header) {
@@ -287,7 +232,7 @@ final class ChatMessagesVC: UIViewController {
     }
   }
 
-  private func distanceFromBottom(minY: CGFloat, viewSize: CGFloat, contentSize: CGFloat) -> CGFloat {
+  func distanceFromBottom(minY: CGFloat, viewSize: CGFloat, contentSize: CGFloat) -> CGFloat {
     let insetBottom = cv.adjustedContentInset.bottom
     let maxY = minY + viewSize
     return (contentSize - maxY) + insetBottom
@@ -355,7 +300,7 @@ final class ChatMessagesVC: UIViewController {
     })
   }
 
-  private func contentSignature(for message: ChatMessage) -> Int {
+  func contentSignature(for message: ChatMessage) -> Int {
     var hasher = Hasher()
     hasher.combine(message.text.count)
     hasher.combine(message.thinking?.full.count ?? 0)
@@ -369,7 +314,7 @@ final class ChatMessagesVC: UIViewController {
     return hasher.finalize()
   }
 
-  private func measureHeight<V: View>(of view: V, width: CGFloat) -> CGFloat {
+  func measureHeight<V: View>(of view: V, width: CGFloat) -> CGFloat {
     let config = UIHostingConfiguration {
       view
         .frame(width: width, alignment: .topLeading)
@@ -383,93 +328,5 @@ final class ChatMessagesVC: UIViewController {
       verticalFittingPriority: .fittingSizeLevel
     )
     return max(1, ceil(size.height))
-  }
-}
-
-// MARK: - UICollectionViewDataSource & Delegate (Haven parity)
-
-extension ChatMessagesVC: UICollectionViewDataSource {
-  func numberOfSections(in collectionView: UICollectionView) -> Int { 1 }
-  func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-    items.count
-  }
-  func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-    let cell = collectionView.dequeueReusableCell(withReuseIdentifier: HostingCell.reuseID, for: indexPath) as! HostingCell
-    let width = collectionView.cvAvailableWidth()
-    let item = items[indexPath.item]
-    switch item {
-    case .message(let id):
-      if store.messages.contains(where: { $0.id == id }) {
-        cell.hostSwiftUI(MessageRow(messageId: id, store: store), width: width)
-      } else {
-        cell.hostSwiftUI(EmptyView(), width: width)
-      }
-    case .typing:
-      cell.hostSwiftUI(TypingIndicator(tint: appColor), width: width)
-    }
-    return cell
-  }
-}
-
-extension ChatMessagesVC: ChatMessagesCVLayoutDelegate, UICollectionViewDelegate {
-  func scrollViewDidScroll(_ scrollView: UIScrollView) {
-    let distFromBottom = distanceFromBottom(minY: scrollView.contentOffset.y, viewSize: scrollView.bounds.height, contentSize: scrollView.contentSize.height)
-    isNearBottom = distFromBottom < 1
-    let shouldShowButton = distFromBottom > 60
-    let shouldHideButton = !shouldShowButton || tempButtonDisable
-    if scrollToBottomButton.isHidden != shouldHideButton {
-      UIView.animate(withDuration: 0.2) {
-        self.scrollToBottomButton.isHidden = shouldHideButton
-        self.scrollToBottomButton.alpha = shouldHideButton ? 0 : 1
-      }
-    }
-  }
-
-  func collectionView(_ collectionView: UICollectionView, layout _: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
-    let width = collectionView.cvAvailableWidth()
-    guard width > 0 else { return CGSize(width: 1, height: 1) }
-    guard indexPath.item < items.count else { return CGSize(width: width, height: 80) }
-    switch items[indexPath.item] {
-    case .message(let id):
-      guard let message = store.messages.first(where: { $0.id == id }) else {
-        return CGSize(width: width, height: 1)
-      }
-      let signature = contentSignature(for: message)
-      if let cached = heightCache[id], cached.signature == signature {
-        return CGSize(width: width, height: cached.height)
-      }
-      let height = measureHeight(of: MessageRow(messageId: id, store: store), width: width)
-      heightCache[id] = (signature, height)
-      return CGSize(width: width, height: height)
-    case .typing:
-      return CGSize(width: width, height: 40)
-    }
-  }
-
-  func collectionView(_: UICollectionView, layout _: UICollectionViewLayout, alignForItemAt _: IndexPath) -> ChatCVAlign {
-    // Full-width rows: UserBubble Spacer right-aligns; assistant text wraps.
-    .left
-  }
-
-  func prepareDone() {}
-}
-
-// MARK: - Self-sizing hosting cell
-
-private final class HostingCell: UICollectionViewCell {
-  static let reuseID = "HostingCell"
-
-  func hostSwiftUI<V: View>(_ view: V, width: CGFloat) {
-    contentConfiguration = UIHostingConfiguration {
-      view
-        .frame(width: width, alignment: .topLeading)
-        .fixedSize(horizontal: false, vertical: true)
-    }
-    .margins(.all, 0)
-  }
-
-  override func prepareForReuse() {
-    super.prepareForReuse()
-    contentConfiguration = nil
   }
 }

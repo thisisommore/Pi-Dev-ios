@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct Header: View {
   @Bindable var store: ChatStore

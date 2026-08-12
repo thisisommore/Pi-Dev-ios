@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct TypingIndicator: View {
   let tint: Color

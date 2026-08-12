@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct TerminalBlock: View {
   let run: TerminalRun

@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct ModelSheet: View {
   @Bindable var store: ChatStore
@@ -93,8 +94,9 @@ struct ModelList: View {
 
 struct ModelRow: View {
   @Bindable var store: ChatStore
-  @Environment(\.dismiss) private var dismiss
   let model: AgentModel
+
+  @Environment(\.dismiss) private var dismiss
 
   var body: some View {
     Button {

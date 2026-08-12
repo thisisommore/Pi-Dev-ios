@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import Combine
 
 enum AICodeChatMock {
   static let chatTitles = [

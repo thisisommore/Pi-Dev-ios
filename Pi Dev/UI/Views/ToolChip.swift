@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import Combine
 
 /// Collapsible wrapper for tool calls and terminal runs ("3 tools").
 struct ToolsDisclosure: View {

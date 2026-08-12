@@ -5,6 +5,7 @@
 
 import SwiftUI
 import UIKit
+import Combine
 
 struct RepoPickerSheet: View {
   @Bindable var store: ChatStore

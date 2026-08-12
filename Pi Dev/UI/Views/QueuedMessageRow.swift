@@ -4,11 +4,13 @@
 //
 
 import SwiftUI
+import Combine
 
 struct QueuedMessageRow: View {
   let queued: QueuedMessage
   let isFirst: Bool
   let onRemove: () -> Void
+
   @Environment(\.colorScheme) private var colorScheme
 
   private var rowShape: some Shape {

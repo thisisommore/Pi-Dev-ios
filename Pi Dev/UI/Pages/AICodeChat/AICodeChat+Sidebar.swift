@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct Sidebar: View {
   @Bindable var store: SidebarStore

@@ -4,12 +4,15 @@
 //
 
 import SwiftUI
+import Combine
 
 struct ChatDetailView: View {
   @Bindable var store: ChatStore
-  @State private var showModelSheet = false
+
   @Binding var showSidebar: Bool
   var onNewChat: () -> Void = {}
+
+  @State private var showModelSheet = false
 
   var body: some View {
     ZStack {

@@ -5,10 +5,14 @@
 
 import SwiftUI
 import UniformTypeIdentifiers
+import Combine
 
 struct Composer: View {
   @Bindable var store: ChatStore
   @Binding var showModelSheet: Bool
+
+  @Environment(\.colorScheme) private var colorScheme
+
   @FocusState private var focused: Bool
   @State private var selectedPastedItem: PastedItem?
   @State private var selectedContextFile: ContextFile?
@@ -16,7 +20,6 @@ struct Composer: View {
   @State private var showClearAlert = false
   @State private var showRepoSheet = false
   @State private var showExpandSheet = false
-  @Environment(\.colorScheme) private var colorScheme
 
   private var hasAttachments: Bool { !store.pastedItems.isEmpty || !store.contextFiles.isEmpty }
   private var canSendMessage: Bool {
@@ -471,48 +474,5 @@ struct Composer: View {
       break
     }
   }
-
 }
 
-// MARK: - Expanded multi-line editor
-
-private struct ComposerExpandSheet: View {
-  @Binding var text: String
-  @FocusState private var focused: Bool
-  @Environment(\.dismiss) private var dismiss
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      Capsule()
-        .fill(.tertiary)
-        .frame(width: 36, height: 5)
-        .frame(maxWidth: .infinity)
-        .padding(.top, 10)
-
-      HStack {
-        Text("Message")
-          .font(.title3.weight(.bold))
-        Spacer()
-        Button("Done") {
-          focused = false
-          dismiss()
-        }
-        .font(.body.weight(.semibold))
-        .foregroundStyle(appLabel)
-      }
-      .padding(.horizontal, 20)
-      .padding(.top, 12)
-      .padding(.bottom, 8)
-
-      TextEditor(text: $text)
-        .font(.body)
-        .scrollContentBackground(.hidden)
-        .tint(.primary)
-        .focused($focused)
-        .padding(.horizontal, 16)
-        .padding(.bottom, 12)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-    .onAppear { focused = true }
-  }
-}

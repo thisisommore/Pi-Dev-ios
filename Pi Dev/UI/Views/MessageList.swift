@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct MessageList: View {
   @Bindable var store: ChatStore
@@ -44,7 +45,7 @@ private struct ScrollViewFallback: View {
       ScrollView {
         LazyVStack(spacing: 12) {
           ForEach(store.messages) { message in
-            MessageRow(messageId: message.id, store: store)
+            MessageRow(store: store, messageId: message.id)
               .id(message.id)
           }
           if store.isResponding {

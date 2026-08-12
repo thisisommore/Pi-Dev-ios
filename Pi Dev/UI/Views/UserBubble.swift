@@ -5,10 +5,11 @@
 
 import SwiftUI
 import UIKit
+import Combine
 
 struct UserBubble: View {
-  let message: ChatMessage
   @Bindable var store: ChatStore
+  let message: ChatMessage
 
   private var attributedText: AttributedString {
     (try? AttributedString(

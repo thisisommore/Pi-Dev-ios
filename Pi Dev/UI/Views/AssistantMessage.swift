@@ -4,10 +4,11 @@
 //
 
 import SwiftUI
+import Combine
 
 struct AssistantMessage: View {
-  let message: ChatMessage
   @Bindable var store: ChatStore
+  let message: ChatMessage
 
   private var hasContent: Bool {
     !message.text.isEmpty || message.thinking != nil || !message.tools.isEmpty || message.error != nil
@@ -269,7 +270,7 @@ struct AssistantMessage: View {
         HStack(spacing: 10) {
           Text("\(message.tokens.compactUS) tok")
           CopyButton(message: message)
-          RetryButton(message: message, store: store)
+          RetryButton(store: store, message: message)
         }
         .font(.caption2)
         .foregroundStyle(.tertiary)
@@ -420,8 +421,8 @@ private struct ErrorBlock: View {
 }
 
 private struct RetryButton: View {
-  let message: ChatMessage
   @Bindable var store: ChatStore
+  let message: ChatMessage
 
   var body: some View {
     Menu {

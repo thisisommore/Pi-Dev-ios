@@ -1,10 +1,6 @@
 //
-//  ChatMessagesCVLayout.swift
+//  ChatMessages+CVLayout.swift
 //  Pi Dev
-//
-//  Ported from Haven's ChatMessages+CVLayout.swift (iOS 17.2) — same custom
-//  UICollectionViewLayout that stacks messages vertically with spacing and
-//  preserves bottom offset on keyboard/rotation.
 //
 
 import UIKit

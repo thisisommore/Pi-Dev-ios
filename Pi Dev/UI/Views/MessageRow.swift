@@ -4,10 +4,11 @@
 //
 
 import SwiftUI
+import Combine
 
 struct MessageRow: View {
-  let messageId: UUID
   @Bindable var store: ChatStore
+  let messageId: UUID
 
   private var message: ChatMessage? {
     store.messages.first { $0.id == messageId }
@@ -20,8 +21,8 @@ struct MessageRow: View {
     Group {
       if let message {
         switch message.role {
-        case .user:      UserBubble(message: message, store: store)
-        case .assistant: AssistantMessage(message: message, store: store)
+        case .user:      UserBubble(store: store, message: message)
+        case .assistant: AssistantMessage(store: store, message: message)
         }
       }
     }
