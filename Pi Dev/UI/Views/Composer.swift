@@ -24,6 +24,11 @@ struct Composer: View {
   }
   private var canExpandDraft: Bool { !store.draft.isEmpty }
 
+  private var commandSuggestions: [PiCommand] {
+    guard store.editingMessageId == nil else { return [] }
+    return store.filteredCommands(for: store.draft)
+  }
+
   var body: some View {
     GlassEffectContainer(spacing: 10) {
       mainContent
@@ -86,9 +91,104 @@ struct Composer: View {
           .padding(.horizontal, 14)
         }
 
+        if !commandSuggestions.isEmpty {
+          commandSuggestionsView
+            .padding(.horizontal, 10)
+            .padding(.bottom, 6)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+
         inputCard
       }
+      .animation(.snappy(duration: 0.2), value: commandSuggestions)
     }
+    .task {
+      if store.availableCommands.isEmpty {
+        await store.loadAvailableCommands()
+      }
+    }
+  }
+
+  private var commandSuggestionsView: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      // Header
+      HStack(spacing: 6) {
+        Image(systemName: "command")
+          .font(.system(size: 10, weight: .bold))
+          .foregroundStyle(.secondary)
+        Text("Commands")
+          .font(.caption2.weight(.bold))
+          .foregroundStyle(.secondary)
+          .textCase(.uppercase)
+        Spacer()
+        Text("\(commandSuggestions.count)")
+          .font(.caption2.weight(.semibold))
+          .foregroundStyle(.tertiary)
+      }
+      .padding(.horizontal, 12)
+      .padding(.vertical, 6)
+
+      Divider().opacity(0.6)
+
+      ScrollView(.vertical, showsIndicators: false) {
+        VStack(spacing: 0) {
+          ForEach(commandSuggestions) { cmd in
+            Button {
+              withAnimation(.snappy) {
+                store.applyCommand(cmd)
+              }
+              // Keep focus in the composer after applying
+              focused = true
+            } label: {
+              commandRow(for: cmd)
+            }
+            .buttonStyle(.plain)
+            if cmd.id != commandSuggestions.last?.id {
+              Divider().opacity(0.4).padding(.leading, 12)
+            }
+          }
+        }
+      }
+      .frame(maxHeight: 220)
+    }
+    .background {
+      RoundedRectangle(cornerRadius: 14, style: .continuous)
+        .fill(.regularMaterial)
+        .shadow(color: .black.opacity(0.08), radius: 10, y: 4)
+        .shadow(color: .black.opacity(0.04), radius: 1, y: 0)
+    }
+    .overlay {
+      RoundedRectangle(cornerRadius: 14, style: .continuous)
+        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+    }
+    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    .compositingGroup()
+  }
+
+  private func commandRow(for cmd: PiCommand) -> some View {
+    HStack(spacing: 10) {
+      VStack(alignment: .leading, spacing: 1) {
+        Text(cmd.invocation)
+          .font(.subheadline.weight(.semibold))
+          .foregroundStyle(.primary)
+          .lineLimit(1)
+        if let desc = cmd.description, !desc.isEmpty {
+          Text(desc)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+        } else if let loc = cmd.location, !loc.isEmpty {
+          Text(loc)
+            .font(.caption2)
+            .foregroundStyle(.tertiary)
+            .lineLimit(1)
+        }
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    .padding(.horizontal, 12)
+    .padding(.vertical, 8)
+    .contentShape(.rect)
   }
 
   private var inputCard: some View {

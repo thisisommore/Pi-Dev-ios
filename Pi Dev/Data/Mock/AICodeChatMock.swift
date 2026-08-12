@@ -42,6 +42,15 @@ enum AICodeChatMock {
     ),
   ]
 
+  static let commands: [PiCommand] = [
+    PiCommand(name: "commit", description: "Create a git commit", source: "extension", location: nil, path: "/pi/extensions/commit.ts"),
+    PiCommand(name: "review", description: "Review code and suggest changes", source: "prompt", location: "project", path: "/pi/prompts/review.md"),
+    PiCommand(name: "fix-tests", description: "Fix failing tests", source: "prompt", location: "project", path: "/pi/prompts/fix-tests.md"),
+    PiCommand(name: "skill:brave-search", description: "Web search via Brave API", source: "skill", location: "user", path: "/pi/skills/brave-search/SKILL.md"),
+    PiCommand(name: "skill:context7", description: "Fetch library docs", source: "skill", location: "user", path: "/pi/skills/context7/SKILL.md"),
+    PiCommand(name: "session-name", description: "Set or clear session name", source: "extension", location: nil, path: "/pi/extensions/session.ts"),
+  ]
+
   /// Fully populated sidebar + active chat for SwiftUI previews.
   static func seed(into sidebar: SidebarStore) {
     let iso = ISO8601DateFormatter()
@@ -75,6 +84,7 @@ enum AICodeChatMock {
   static func seed(into store: ChatStore) {
     store.chatTitle = "Debounce repo search"
     store.availableModels = models
+    store.availableCommands = commands
     store.selectedModel = models[1]
     store.thinkingLevel = .high
     store.supportedThinkingLevels = ThinkingLevel.defaultLevels

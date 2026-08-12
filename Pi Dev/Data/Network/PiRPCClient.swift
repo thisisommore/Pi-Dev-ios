@@ -132,6 +132,10 @@ final class PiRPCClient {
     try await send(command: ["type": "get_available_models"])
   }
 
+  func getCommands() async throws -> RPCResponse<CommandsResponse> {
+    try await send(command: ["type": "get_commands"])
+  }
+
   // MARK: - Health check
 
   /// Validates the configured base URL and auth token by calling `get_state`.

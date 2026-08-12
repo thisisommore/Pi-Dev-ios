@@ -17,6 +17,7 @@ struct CacheBootstrap: Sendable {
   var models: [AgentModel]
   var lastModelId: String?
   var chat: CachedChatSnapshot?
+  var commands: [PiCommand]
 }
 
 struct CachedChatSnapshot: Sendable {
@@ -62,7 +63,12 @@ enum PiCache {
           .order(by: \.position)
           .fetchAll(db)
 
-        guard !sessionRows.isEmpty || !modelRows.isEmpty || prefs?.lastSessionId != nil else {
+        let commandRows = try CachedCommandRow
+          .where { $0.serverKey.eq(key) }
+          .order(by: \.position)
+          .fetchAll(db)
+
+        guard !sessionRows.isEmpty || !modelRows.isEmpty || !commandRows.isEmpty || prefs?.lastSessionId != nil else {
           return nil
         }
 
@@ -81,7 +87,8 @@ enum PiCache {
           lastSessionId: lastSessionId,
           models: modelRows.map(\.asAgentModel),
           lastModelId: prefs?.serverKey == key ? prefs?.lastModelId : nil,
-          chat: chat
+          chat: chat,
+          commands: commandRows.map(\.asPiCommand)
         )
       }
     } catch {
@@ -162,6 +169,43 @@ enum PiCache {
       }
     } catch {
       logger.error("saveModels failed: \(error.localizedDescription)")
+    }
+  }
+
+  static func loadCommands() -> [PiCommand] {
+    let key = serverKey
+    guard !key.isEmpty else { return [] }
+    do {
+      @Dependency(\.defaultDatabase) var database
+      return try database.read { db in
+        try CachedCommandRow
+          .where { $0.serverKey.eq(key) }
+          .order(by: \.position)
+          .fetchAll(db)
+          .map(\.asPiCommand)
+      }
+    } catch {
+      logger.error("loadCommands failed: \(error.localizedDescription)")
+      return []
+    }
+  }
+
+  static func saveCommands(_ commands: [PiCommand]) {
+    let key = serverKey
+    guard !key.isEmpty else { return }
+    do {
+      @Dependency(\.defaultDatabase) var database
+      try database.write { db in
+        try CachedCommandRow.where { $0.serverKey.eq(key) }.delete().execute(db)
+        for (index, command) in commands.enumerated() {
+          try CachedCommandRow.insert {
+            CachedCommandRow(command: command, position: index, serverKey: key)
+          }
+          .execute(db)
+        }
+      }
+    } catch {
+      logger.error("saveCommands failed: \(error.localizedDescription)")
     }
   }
 
@@ -267,6 +311,7 @@ enum PiCache {
       try database.write { db in
         try CachedSessionRow.delete().execute(db)
         try CachedModelRow.delete().execute(db)
+        try CachedCommandRow.delete().execute(db)
         try CachedChatRow.delete().execute(db)
         try CachePrefsRow.delete().execute(db)
       }

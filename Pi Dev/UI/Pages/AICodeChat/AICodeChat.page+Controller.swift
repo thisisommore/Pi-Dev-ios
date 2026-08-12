@@ -13,6 +13,7 @@ final class ChatStore: Identifiable {
   var messages: [ChatMessage] = []
   var selectedModel: AgentModel? = nil
   var availableModels: [AgentModel] = []
+  var availableCommands: [PiCommand] = []
   var thinkingLevel: ThinkingLevel = .high
   var supportedThinkingLevels: [ThinkingLevel] = ThinkingLevel.defaultLevels
   var usedTokens: Int = 0
@@ -46,6 +47,7 @@ final class ChatStore: Identifiable {
     // Models hydrate via SidebarStore.bootstrap; still refresh in background.
     Task { @MainActor in
       await loadAvailableModels()
+      await loadAvailableCommands()
     }
   }
 
@@ -85,6 +87,112 @@ final class ChatStore: Identifiable {
       selectedModel = nil
     }
     // Otherwise leave nil so the UI shows "Model" until get_state / user pick.
+  }
+
+  func applyCachedCommands(_ commands: [PiCommand]) {
+    guard !commands.isEmpty else { return }
+    if availableCommands != commands {
+      availableCommands = commands
+    }
+  }
+
+  func loadAvailableCommands() async {
+    do {
+      let response = try await rpcClient.getCommands()
+      if let commands = response.data?.commands {
+        if self.availableCommands != commands {
+          self.availableCommands = commands
+        }
+        PiCache.saveCommands(commands)
+      }
+    } catch {
+      // Keep cached commands if fetch fails.
+    }
+  }
+
+  /// Filters commands for autocomplete based on the current draft.
+  /// Supports leading "/" (e.g. "/fix") and inline trailing "/xyz".
+  /// Hidden once the slash token is completed with a trailing space.
+  func filteredCommands(for draft: String) -> [PiCommand] {
+    guard !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return [] }
+    if editingMessageId != nil { return [] }
+
+    // Use left-trimmed version to preserve trailing space info (trimming only leading spaces).
+    let leftTrimmed = draft.replacingOccurrences(of: "^\\s+", with: "", options: .regularExpression)
+    guard !leftTrimmed.isEmpty else { return [] }
+
+    let query: String
+    if leftTrimmed.hasPrefix("/") {
+      let afterSlash = String(leftTrimmed.dropFirst())
+      if let spaceIdx = afterSlash.firstIndex(where: { $0.isWhitespace }) {
+        // There's whitespace after the slash token — user has typed args or trailing space.
+        // Hide suggestions once token is separated (completed or abandoned).
+        let token = String(afterSlash[..<spaceIdx])
+        // Still hide regardless of exact match; slash token is no longer active editing.
+        // But keep showing if token is empty? No, spaceIdx at start would be empty token.
+        if token.isEmpty { return [] }
+        return []
+      } else {
+        query = afterSlash
+      }
+    } else {
+      // Look for trailing "/xyz" token at end of draft.
+      // If draft ends with whitespace, user finished the token -> hide.
+      if leftTrimmed.last?.isWhitespace == true { return [] }
+      // Find last "/" preceded by whitespace or start, with no whitespace after.
+      // Use last whitespace-separated token that starts with "/"
+      let tokens = leftTrimmed.split(whereSeparator: { $0.isWhitespace })
+      guard let last = tokens.last, last.hasPrefix("/") else { return [] }
+      var afterSlash = String(last.dropFirst())
+      if afterSlash.contains("\n") {
+        afterSlash = afterSlash.components(separatedBy: "\n").last ?? ""
+      }
+      query = afterSlash
+    }
+
+    let lower = query.lowercased()
+    let candidates: [PiCommand]
+    if lower.isEmpty {
+      candidates = availableCommands
+    } else {
+      candidates = availableCommands.filter {
+        $0.name.lowercased().contains(lower) ||
+        ($0.description?.lowercased().contains(lower) ?? false)
+      }
+    }
+
+    let sorted = candidates.sorted { a, b in
+      let aLower = a.name.lowercased()
+      let bLower = b.name.lowercased()
+      let aPrefix = aLower.hasPrefix(lower)
+      let bPrefix = bLower.hasPrefix(lower)
+      if aPrefix != bPrefix { return aPrefix && !bPrefix }
+      return aLower < bLower
+    }
+    return Array(sorted.prefix(8))
+  }
+
+  /// Applies a command suggestion to the draft, replacing the slash token.
+  func applyCommand(_ command: PiCommand) {
+    let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+    if trimmed.hasPrefix("/") {
+      let afterSlash = String(trimmed.dropFirst())
+      if let spaceIdx = afterSlash.firstIndex(where: { $0.isWhitespace }) {
+        let remainder = String(afterSlash[spaceIdx...]) // includes space + rest
+        draft = "/" + command.name + remainder
+      } else {
+        draft = "/" + command.name + " "
+      }
+    } else {
+      // Replace last "/xyz" token
+      // Find last occurrence of " /"
+      if let range = trimmed.range(of: "/", options: .backwards) {
+        let before = String(trimmed[..<range.lowerBound])
+        draft = before + "/" + command.name + " "
+      } else {
+        draft = "/" + command.name + " "
+      }
+    }
   }
 
   func loadAvailableModels() async {
@@ -897,6 +1005,7 @@ final class SidebarStore {
       bootstrap.models,
       preferredModelId: bootstrap.lastModelId
     )
+    activeChat.applyCachedCommands(bootstrap.commands)
 
     if let chat = bootstrap.chat {
       activeChat.applyCachedSnapshot(
@@ -917,6 +1026,7 @@ final class SidebarStore {
 
     await loadSessions()
     await activeChat.loadAvailableModels()
+    await activeChat.loadAvailableCommands()
     await syncActiveSession(clearBeforeLoad: false)
     persistPrefs()
   }

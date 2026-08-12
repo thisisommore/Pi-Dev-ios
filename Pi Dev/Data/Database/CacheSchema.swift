@@ -57,6 +57,22 @@ struct CachedChatRow: Hashable, Identifiable, Sendable {
   var id: String { sessionId }
 }
 
+/// Cached pi commands (get_commands).
+@Table("cachedCommands")
+struct CachedCommandRow: Hashable, Identifiable, Sendable {
+  @Column(primaryKey: true)
+  let name: String
+  @Column("desc")
+  var desc: String?
+  var source: String
+  var location: String?
+  var path: String?
+  var position: Int
+  var serverKey: String
+
+  var id: String { name }
+}
+
 /// Singleton prefs row (`id` is always `"main"`).
 @Table("cachePrefs")
 struct CachePrefsRow: Hashable, Identifiable, Sendable {
@@ -252,6 +268,22 @@ extension CachedTerminalDTO {
 
   var asTerminalRun: TerminalRun {
     TerminalRun(command: command, output: output, exitCode: exitCode)
+  }
+}
+
+extension CachedCommandRow {
+  init(command: PiCommand, position: Int, serverKey: String) {
+    self.name = command.name
+    self.desc = command.description
+    self.source = command.source
+    self.location = command.location
+    self.path = command.path
+    self.position = position
+    self.serverKey = serverKey
+  }
+
+  var asPiCommand: PiCommand {
+    PiCommand(name: name, description: desc, source: source, location: location, path: path)
   }
 }
 
