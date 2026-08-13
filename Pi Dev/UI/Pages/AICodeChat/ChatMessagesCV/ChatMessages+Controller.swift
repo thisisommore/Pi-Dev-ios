@@ -17,6 +17,7 @@ final class ChatMessagesVC: UIViewController {
   private var previousViewSize: CGFloat = 0
   private var lastMeasuredWidth: CGFloat = 0
   var heightCache: [UUID: (signature: Int, height: CGFloat)] = [:]
+  private var lastAppliedToolGroups: Set<UUID> = []
   private var headerHost: UIHostingController<Header>?
   private var headerTopConstraint: NSLayoutConstraint?
   private var statusBarBlurHeight: NSLayoutConstraint?
@@ -133,7 +134,6 @@ final class ChatMessagesVC: UIViewController {
       var lastText: String? = self.store.messages.last?.text
       var lastStreaming = self.store.messages.last?.isStreaming
       var lastGenerating = self.store.generatingMessageId
-      var lastExpanded = self.store.expandedToolGroups
       while !Task.isCancelled {
         try? await Task.sleep(for: .milliseconds(100))
         let count = self.store.messages.count
@@ -141,21 +141,14 @@ final class ChatMessagesVC: UIViewController {
         let currentLastText = self.store.messages.last?.text
         let streaming = self.store.messages.last?.isStreaming
         let generating = self.store.generatingMessageId
-        let expanded = self.store.expandedToolGroups
         if count != lastCount || typing != lastTyping || currentLastText != lastText
-          || streaming != lastStreaming || generating != lastGenerating
-          || expanded != lastExpanded {
-          let expansionChanged = expanded != lastExpanded
+          || streaming != lastStreaming || generating != lastGenerating {
           lastCount = count
           lastTyping = typing
           lastText = currentLastText
           lastStreaming = streaming
           lastGenerating = generating
-          lastExpanded = expanded
-          if expansionChanged {
-            self.heightCache.removeAll()
-          }
-          self.applySnapshot(animated: !expansionChanged)
+          self.applySnapshot(animated: true)
         }
       }
     }
@@ -190,18 +183,55 @@ final class ChatMessagesVC: UIViewController {
     NotificationCenter.default.removeObserver(self)
   }
 
-  func applySnapshot(animated: Bool) {
+  func syncList() {
+    let newItems: [ChatCVItem] = store.messages.map { .message($0.id) } + (store.isResponding ? [.typing] : [])
+    if newItems != items {
+      self.lastAppliedToolGroups = self.store.expandedToolGroups
+      self.applySnapshot(animated: true)
+      return
+    }
+    if self.store.expandedToolGroups != self.lastAppliedToolGroups {
+      self.lastAppliedToolGroups = self.store.expandedToolGroups
+      self.relayoutHeightsForExpandedTools()
+    }
+  }
+
+  private func relayoutHeightsForExpandedTools() {
+    for item in self.items {
+      guard case .message(let id) = item,
+            let message = self.store.messages.first(where: { $0.id == id })
+      else { continue }
+      let signature = self.contentSignature(for: message)
+      if self.heightCache[id]?.signature != signature {
+        self.heightCache.removeValue(forKey: id)
+      }
+    }
+    UIView.performWithoutAnimation {
+      self.cv.collectionViewLayout.invalidateLayout()
+      self.cv.layoutIfNeeded()
+    }
+  }
+
+  func applySnapshot(animated: Bool, pinToBottom: Bool = true) {
     let newItems: [ChatCVItem] = store.messages.map { .message($0.id) } + (store.isResponding ? [.typing] : [])
     let wasNearBottom = isNearBottom
     let shouldAnimate = animated && !store.isStreaming
-    if newItems != items {
-      items = newItems
-      cv.reloadData()
-      cv.layoutIfNeeded()
-    } else {
-      cv.collectionViewLayout.invalidateLayout()
+    let relayout = {
+      if newItems != self.items {
+        self.items = newItems
+        self.cv.reloadData()
+        self.cv.layoutIfNeeded()
+      } else {
+        self.cv.collectionViewLayout.invalidateLayout()
+        self.cv.layoutIfNeeded()
+      }
     }
-    if wasNearBottom, let last = newItems.last {
+    if shouldAnimate {
+      relayout()
+    } else {
+      UIView.performWithoutAnimation(relayout)
+    }
+    if pinToBottom, wasNearBottom, let last = newItems.last {
       DispatchQueue.main.async {
         self.scrollToItem(last, animated: shouldAnimate)
       }
@@ -319,8 +349,16 @@ final class ChatMessagesVC: UIViewController {
     hasher.combine(message.isStreaming)
     hasher.combine(message.id == store.messages.last?.id)
     hasher.combine(store.generatingMessageId == nil)
-    hasher.combine(store.expandedToolGroups)
+    hasher.combine(self.expandedToolGroups(in: message))
     return hasher.finalize()
+  }
+
+  private func expandedToolGroups(in message: ChatMessage) -> Set<UUID> {
+    var ids: Set<UUID> = [message.id]
+    for tool in message.tools { ids.insert(tool.id) }
+    for run in message.terminal { ids.insert(run.id) }
+    for segment in message.segments { ids.insert(segment.id) }
+    return self.store.expandedToolGroups.intersection(ids)
   }
 
   func measureHeight<V: View>(of view: V, width: CGFloat) -> CGFloat {

@@ -44,7 +44,7 @@ struct ToolsDisclosure: View {
     } else {
       VStack(alignment: .leading, spacing: 6) {
         Button {
-          withAnimation(.snappy) { self.isExpanded.toggle() }
+          self.isExpanded.toggle()
         } label: {
           HStack(spacing: 8) {
             Image(systemName: "wrench.and.screwdriver")
@@ -59,6 +59,7 @@ struct ToolsDisclosure: View {
               .font(.system(size: 9, weight: .bold))
               .foregroundStyle(.tertiary)
               .rotationEffect(.degrees(self.isExpanded ? 90 : 0))
+              .animation(.snappy, value: self.isExpanded)
 
             Spacer(minLength: 0)
           }
@@ -69,21 +70,26 @@ struct ToolsDisclosure: View {
           .contentShape(.rect(cornerRadius: 12))
         }
         .buttonStyle(.plain)
+        .transaction { $0.animation = nil }
 
-        if self.isExpanded {
-          VStack(alignment: .leading, spacing: 6) {
-            ForEach(items) { item in
-              switch item {
-              case .tool(let tool):
-                ToolChip(tool: tool)
-              case .terminal(let run):
-                TerminalBlock(run: run)
+        VStack(alignment: .leading, spacing: 6) {
+          if self.isExpanded {
+            VStack(alignment: .leading, spacing: 6) {
+              ForEach(items) { item in
+                switch item {
+                case .tool(let tool):
+                  ToolChip(tool: tool)
+                case .terminal(let run):
+                  TerminalBlock(run: run)
+                }
               }
             }
+            .padding(.leading, 4)
+            .transition(.opacity.combined(with: .move(edge: .top)))
           }
-          .padding(.leading, 4)
-          .transition(.opacity.combined(with: .move(edge: .top)))
         }
+        .clipped()
+        .animation(.snappy, value: self.isExpanded)
       }
     }
   }

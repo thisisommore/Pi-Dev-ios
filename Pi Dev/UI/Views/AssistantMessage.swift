@@ -199,6 +199,7 @@ struct AssistantMessage: View {
 
       if let thinking = message.thinking {
         ThinkingBlock(thinking: thinking)
+          .transaction { $0.animation = nil }
       }
       if !message.segments.isEmpty {
         ForEach(displaySections) { section in

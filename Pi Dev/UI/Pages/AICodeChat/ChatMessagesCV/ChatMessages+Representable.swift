@@ -26,6 +26,6 @@ struct ChatMessagesView: UIViewControllerRepresentable {
         onNewChat: onNewChat
       )
     )
-    uiViewController.applySnapshot(animated: true)
+    uiViewController.syncList()
   }
 }
