@@ -58,6 +58,7 @@ private struct ScrollViewFallback: View {
         .padding(.bottom, 20)
       }
       .frame(maxHeight: .infinity)
+      .scrollDisabled(store.editingMessageId != nil)
       .scrollDismissesKeyboard(.interactively)
       .onChange(of: store.messages.count) { oldCount, newCount in
         if oldCount == 0 && newCount > 0 { isNearBottom = true }
@@ -67,6 +68,10 @@ private struct ScrollViewFallback: View {
       .onChange(of: store.messages.last?.text) {
         guard isNearBottom else { return }
         withAnimation(.snappy) { proxy.scrollTo(store.messages.last?.id, anchor: .bottom) }
+      }
+      .onChange(of: store.editingMessageId) { _, id in
+        guard let id else { return }
+        withAnimation(.snappy) { proxy.scrollTo(id, anchor: .top) }
       }
     }
   }

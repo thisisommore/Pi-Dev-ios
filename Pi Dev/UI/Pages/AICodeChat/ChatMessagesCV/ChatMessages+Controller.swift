@@ -15,6 +15,8 @@ final class ChatMessagesVC: UIViewController {
   var isNearBottom: Bool = true
   var tempButtonDisable = true
   private var previousViewSize: CGFloat = 0
+  private var lastEditingMessageId: UUID?
+  private var pendingKeepEditVisible = false
   private var lastMeasuredWidth: CGFloat = 0
   var heightCache: [UUID: (signature: Int, height: CGFloat)] = [:]
   private var lastAppliedToolGroups: Set<UUID> = []
@@ -187,6 +189,7 @@ final class ChatMessagesVC: UIViewController {
   }
 
   func syncList() {
+    self.markEditingMessageIfNeeded()
     let newItems: [ChatCVItem] = store.messages.map { .message($0.id) } + (store.isResponding ? [.typing] : [])
     if newItems != items {
       self.lastAppliedToolGroups = self.store.expandedToolGroups
@@ -298,6 +301,47 @@ final class ChatMessagesVC: UIViewController {
     cv.setContentOffset(CGPoint(x: cv.contentOffset.x, y: newMinY), animated: false)
   }
 
+  private func markEditingMessageIfNeeded() {
+    let id = store.editingMessageId
+    guard id != lastEditingMessageId else { return }
+    lastEditingMessageId = id
+    cv.isScrollEnabled = id == nil
+    pendingKeepEditVisible = id != nil
+    if pendingKeepEditVisible {
+      view.setNeedsLayout()
+    }
+  }
+
+  private func keepEditingMessageVisible() {
+    guard let id = store.editingMessageId,
+          let index = items.firstIndex(of: .message(id)) else { return }
+    guard !cv.isDragging && !cv.isTracking else { return }
+    let indexPath = IndexPath(item: index, section: 0)
+    guard indexPath.item < cv.numberOfItems(inSection: 0),
+          let frame = cv.layoutAttributesForItem(at: indexPath)?.frame else { return }
+
+    let inset = cv.adjustedContentInset
+    let visibleMinY = cv.contentOffset.y + inset.top
+    let visibleMaxY = cv.contentOffset.y + cv.bounds.height - inset.bottom
+    let visibleHeight = visibleMaxY - visibleMinY
+    guard visibleHeight > 0 else { return }
+
+    var newOffsetY = cv.contentOffset.y
+    if frame.height >= visibleHeight - 1 || frame.minY < visibleMinY {
+      newOffsetY = frame.minY - inset.top
+    } else if frame.maxY > visibleMaxY {
+      newOffsetY = frame.maxY + inset.bottom - cv.bounds.height
+    } else {
+      return
+    }
+
+    let minOffset = -inset.top
+    let maxOffset = max(minOffset, cv.contentSize.height + inset.bottom - cv.bounds.height)
+    newOffsetY = min(max(newOffsetY, minOffset), maxOffset)
+    if abs(newOffsetY - cv.contentOffset.y) < 0.5 { return }
+    cv.setContentOffset(CGPoint(x: cv.contentOffset.x, y: newOffsetY), animated: false)
+  }
+
   override func viewDidLayoutSubviews() {
     super.viewDidLayoutSubviews()
     updateTopChrome()
@@ -307,7 +351,15 @@ final class ChatMessagesVC: UIViewController {
       heightCache.removeAll()
       cv.collectionViewLayout.invalidateLayout()
     }
-    preserveBottomOffset()
+    let newViewSize = cv.bounds.height
+    let sizeChanged = newViewSize > 0 && newViewSize != previousViewSize
+    if store.editingMessageId != nil, pendingKeepEditVisible || sizeChanged {
+      pendingKeepEditVisible = false
+      keepEditingMessageVisible()
+      previousViewSize = newViewSize
+    } else {
+      preserveBottomOffset()
+    }
   }
 
   private var statusBarOverlap: CGFloat {
