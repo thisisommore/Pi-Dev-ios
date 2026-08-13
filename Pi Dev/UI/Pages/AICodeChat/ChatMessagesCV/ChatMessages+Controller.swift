@@ -133,6 +133,7 @@ final class ChatMessagesVC: UIViewController {
       var lastText: String? = self.store.messages.last?.text
       var lastStreaming = self.store.messages.last?.isStreaming
       var lastGenerating = self.store.generatingMessageId
+      var lastExpanded = self.store.expandedToolGroups
       while !Task.isCancelled {
         try? await Task.sleep(for: .milliseconds(100))
         let count = self.store.messages.count
@@ -140,14 +141,21 @@ final class ChatMessagesVC: UIViewController {
         let currentLastText = self.store.messages.last?.text
         let streaming = self.store.messages.last?.isStreaming
         let generating = self.store.generatingMessageId
+        let expanded = self.store.expandedToolGroups
         if count != lastCount || typing != lastTyping || currentLastText != lastText
-          || streaming != lastStreaming || generating != lastGenerating {
+          || streaming != lastStreaming || generating != lastGenerating
+          || expanded != lastExpanded {
+          let expansionChanged = expanded != lastExpanded
           lastCount = count
           lastTyping = typing
           lastText = currentLastText
           lastStreaming = streaming
           lastGenerating = generating
-          self.applySnapshot(animated: true)
+          lastExpanded = expanded
+          if expansionChanged {
+            self.heightCache.removeAll()
+          }
+          self.applySnapshot(animated: !expansionChanged)
         }
       }
     }
@@ -311,6 +319,7 @@ final class ChatMessagesVC: UIViewController {
     hasher.combine(message.isStreaming)
     hasher.combine(message.id == store.messages.last?.id)
     hasher.combine(store.generatingMessageId == nil)
+    hasher.combine(store.expandedToolGroups)
     return hasher.finalize()
   }
 

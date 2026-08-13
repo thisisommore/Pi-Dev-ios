@@ -184,6 +184,13 @@ struct AssistantMessage: View {
     return blocks
   }
 
+  private func toolGroupBinding(_ id: UUID) -> Binding<Bool> {
+    Binding(
+      get: { self.message.isStreaming || self.store.isToolGroupExpanded(id) },
+      set: { self.store.setToolGroup(id, expanded: $0) }
+    )
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: 2) {
       if message.isStreaming && !hasContent {
@@ -217,10 +224,10 @@ struct AssistantMessage: View {
                 }
               }
             }
-          case .activity(_, let items):
+          case .activity(let id, let items):
             ToolsDisclosure(
               items: items,
-              initiallyExpanded: message.isStreaming
+              isExpanded: self.toolGroupBinding(id)
             )
             .padding(.top, 2)
             .padding(.bottom, 2)
@@ -231,7 +238,7 @@ struct AssistantMessage: View {
           ToolsDisclosure(
             tools: message.tools,
             terminal: message.terminal,
-            initiallyExpanded: message.isStreaming
+            isExpanded: self.toolGroupBinding(message.id)
           )
           .padding(.top, message.thinking != nil ? 2 : 0)
         }

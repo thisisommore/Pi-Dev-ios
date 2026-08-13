@@ -55,6 +55,10 @@ final class ChatStore: Identifiable {
   var isGenerating: Bool { isResponding || isStreaming }
   var stopRequested = false
 
+  /// Tool disclosure groups the user has opened. Used so the collection view
+  /// can remasure cell height when expand/collapse changes.
+  var expandedToolGroups: Set<UUID> = []
+
   // Stable UUID per queue entry — avoids ForEach diff glitches when removing by offset.
   var queuedMessageIDs: [UUID] = []
 
@@ -97,6 +101,7 @@ final class ChatStore: Identifiable {
     includedRepo = nil
     messageQueue = []
     generatingMessageId = nil
+    expandedToolGroups = []
 
     if !models.isEmpty {
       availableModels = models
@@ -125,6 +130,18 @@ final class ChatStore: Identifiable {
     guard !commands.isEmpty else { return }
     if availableCommands != commands {
       availableCommands = commands
+    }
+  }
+
+  func isToolGroupExpanded(_ id: UUID) -> Bool {
+    self.expandedToolGroups.contains(id)
+  }
+
+  func setToolGroup(_ id: UUID, expanded: Bool) {
+    if expanded {
+      self.expandedToolGroups.insert(id)
+    } else {
+      self.expandedToolGroups.remove(id)
     }
   }
 }

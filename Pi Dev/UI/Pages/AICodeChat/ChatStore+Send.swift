@@ -19,6 +19,7 @@ extension ChatStore {
       contextFiles = []
       includedRepo = nil
       messageQueue = []
+      expandedToolGroups = []
     }
   }
 
@@ -32,6 +33,7 @@ extension ChatStore {
       contextFiles = []
       includedRepo = nil
       messageQueue = []
+      expandedToolGroups = []
     }
   }
 

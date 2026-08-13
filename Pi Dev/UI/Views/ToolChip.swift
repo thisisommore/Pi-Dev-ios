@@ -21,16 +21,16 @@ struct ToolsDisclosure: View {
   }
 
   let items: [Item]
-  @State private var expanded: Bool
+  @Binding var isExpanded: Bool
 
-  init(items: [Item], initiallyExpanded: Bool = false) {
+  init(items: [Item], isExpanded: Binding<Bool>) {
     self.items = items
-    _expanded = State(initialValue: initiallyExpanded)
+    self._isExpanded = isExpanded
   }
 
-  init(tools: [ToolUse], terminal: [TerminalRun] = [], initiallyExpanded: Bool = false) {
+  init(tools: [ToolUse], terminal: [TerminalRun] = [], isExpanded: Binding<Bool>) {
     self.items = tools.map { .tool($0) } + terminal.map { .terminal($0) }
-    _expanded = State(initialValue: initiallyExpanded)
+    self._isExpanded = isExpanded
   }
 
   private var title: String {
@@ -44,7 +44,7 @@ struct ToolsDisclosure: View {
     } else {
       VStack(alignment: .leading, spacing: 6) {
         Button {
-          withAnimation(.snappy) { expanded.toggle() }
+          withAnimation(.snappy) { self.isExpanded.toggle() }
         } label: {
           HStack(spacing: 8) {
             Image(systemName: "wrench.and.screwdriver")
@@ -58,7 +58,7 @@ struct ToolsDisclosure: View {
             Image(systemName: "chevron.right")
               .font(.system(size: 9, weight: .bold))
               .foregroundStyle(.tertiary)
-              .rotationEffect(.degrees(expanded ? 90 : 0))
+              .rotationEffect(.degrees(self.isExpanded ? 90 : 0))
 
             Spacer(minLength: 0)
           }
@@ -70,7 +70,7 @@ struct ToolsDisclosure: View {
         }
         .buttonStyle(.plain)
 
-        if expanded {
+        if self.isExpanded {
           VStack(alignment: .leading, spacing: 6) {
             ForEach(items) { item in
               switch item {
@@ -91,9 +91,10 @@ struct ToolsDisclosure: View {
 
 struct ToolRow: View {
   let tools: [ToolUse]
+  @Binding var isExpanded: Bool
 
   var body: some View {
-    ToolsDisclosure(tools: tools)
+    ToolsDisclosure(tools: tools, isExpanded: $isExpanded)
   }
 }
 

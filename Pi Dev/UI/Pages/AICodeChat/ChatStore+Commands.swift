@@ -161,6 +161,7 @@ extension ChatStore {
         contextFiles = []
         includedRepo = nil
         messageQueue = []
+        expandedToolGroups = []
       }
     }
   }
