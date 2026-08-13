@@ -206,10 +206,32 @@ final class ChatMessagesVC: UIViewController {
         self.heightCache.removeValue(forKey: id)
       }
     }
-    UIView.performWithoutAnimation {
+    let anchorPath = self.cv.indexPathsForVisibleItems.sorted().first
+    let anchorScreenY: CGFloat? = {
+      guard let path = anchorPath, let cell = self.cv.cellForItem(at: path) else { return nil }
+      return cell.frame.minY - self.cv.contentOffset.y
+    }()
+    self.cv.performBatchUpdates({
       self.cv.collectionViewLayout.invalidateLayout()
       self.cv.layoutIfNeeded()
-    }
+      UIView.performWithoutAnimation {
+        self.pinVisibleItem(anchorPath, screenY: anchorScreenY)
+      }
+    }, completion: { _ in
+      UIView.performWithoutAnimation {
+        self.pinVisibleItem(anchorPath, screenY: anchorScreenY)
+      }
+    })
+  }
+
+  private func pinVisibleItem(_ path: IndexPath?, screenY: CGFloat?) {
+    guard let path, let screenY,
+          let attrs = self.cv.layoutAttributesForItem(at: path)
+    else { return }
+    self.cv.contentOffset = CGPoint(
+      x: self.cv.contentOffset.x,
+      y: attrs.frame.minY - screenY
+    )
   }
 
   func applySnapshot(animated: Bool, pinToBottom: Bool = true) {

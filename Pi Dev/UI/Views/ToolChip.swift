@@ -44,7 +44,11 @@ struct ToolsDisclosure: View {
     } else {
       VStack(alignment: .leading, spacing: 6) {
         Button {
-          self.isExpanded.toggle()
+          var transaction = Transaction()
+          transaction.animation = nil
+          withTransaction(transaction) {
+            self.isExpanded.toggle()
+          }
         } label: {
           HStack(spacing: 8) {
             Image(systemName: "wrench.and.screwdriver")

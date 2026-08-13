@@ -138,10 +138,14 @@ final class ChatStore: Identifiable {
   }
 
   func setToolGroup(_ id: UUID, expanded: Bool) {
-    if expanded {
-      self.expandedToolGroups.insert(id)
-    } else {
-      self.expandedToolGroups.remove(id)
+    var transaction = Transaction()
+    transaction.animation = nil
+    withTransaction(transaction) {
+      if expanded {
+        self.expandedToolGroups.insert(id)
+      } else {
+        self.expandedToolGroups.remove(id)
+      }
     }
   }
 }

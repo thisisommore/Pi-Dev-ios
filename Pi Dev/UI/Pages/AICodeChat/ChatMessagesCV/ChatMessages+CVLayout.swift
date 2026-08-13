@@ -39,6 +39,8 @@ final class ChatMessagesCVLayout: UICollectionViewLayout {
   private(set) var prevIndexForBackUpPoint = 0
 
   var backupPoint: CGPoint = .zero
+  /// Set only when loading older messages so the visible row stays put.
+  var usesBackupPoint = false
   override var collectionViewContentSize: CGSize {
     CGSize(width: collectionView!.cvAvailableWidth(), height: height)
   }
@@ -108,11 +110,11 @@ final class ChatMessagesCVLayout: UICollectionViewLayout {
           let firstMatchIndex = binSearch(rect, start: 0, end: lastIndex) else { return attributesArray }
     for attributes in cachedAttributes[..<firstMatchIndex].reversed() {
       guard attributes.frame.maxY >= rect.minY else { break }
-      attributesArray.append(attributes)
+      attributesArray.append(attributes.copy() as! UICollectionViewLayoutAttributes)
     }
     for attributes in cachedAttributes[firstMatchIndex...] {
       guard attributes.frame.minY <= rect.maxY else { break }
-      attributesArray.append(attributes)
+      attributesArray.append(attributes.copy() as! UICollectionViewLayoutAttributes)
     }
     return attributesArray
   }
@@ -128,7 +130,7 @@ final class ChatMessagesCVLayout: UICollectionViewLayout {
 
   override func layoutAttributesForItem(at indexPath: IndexPath) -> UICollectionViewLayoutAttributes? {
     guard indexPath.item < cachedAttributes.count else { return nil }
-    return cachedAttributes[indexPath.item]
+    return cachedAttributes[indexPath.item].copy() as? UICollectionViewLayoutAttributes
   }
 
   override func shouldInvalidateLayout(forBoundsChange newBounds: CGRect) -> Bool {
@@ -137,6 +139,9 @@ final class ChatMessagesCVLayout: UICollectionViewLayout {
   }
 
   override func targetContentOffset(forProposedContentOffset proposedContentOffset: CGPoint) -> CGPoint {
+    guard self.usesBackupPoint else {
+      return proposedContentOffset
+    }
     let relocatedElementAttrs: UICollectionViewLayoutAttributes? = layoutAttributesForItem(at: IndexPath(item: newIndexForBackUpPoint, section: 0))
     guard let relocatedElementAttrs else {
       return super.targetContentOffset(forProposedContentOffset: proposedContentOffset)

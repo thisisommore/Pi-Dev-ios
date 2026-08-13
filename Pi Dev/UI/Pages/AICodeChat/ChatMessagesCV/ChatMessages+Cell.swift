@@ -13,9 +13,14 @@ final class HostingCell: UICollectionViewCell {
     contentConfiguration = UIHostingConfiguration {
       view
         .frame(width: width, alignment: .topLeading)
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
     .margins(.all, 0)
+  }
+
+  override func preferredLayoutAttributesFitting(_ layoutAttributes: UICollectionViewLayoutAttributes)
+    -> UICollectionViewLayoutAttributes {
+    layoutAttributes
   }
 
   override func prepareForReuse() {
