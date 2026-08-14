@@ -129,18 +129,38 @@ struct AssistantMessage: View {
     var blocks: [MarkdownBlock] = []
     let lines = text.components(separatedBy: "\n")
     var i = 0
-    var insideCodeFence = false
+    var fenceLanguage: String?
+    var fenceLines: [String] = []
+    var fenceStart = 0
+
+    func isFence(_ line: String) -> String? {
+      let trimmed = line.trimmingCharacters(in: .whitespaces)
+      guard trimmed.hasPrefix("```") else { return nil }
+      return String(trimmed.dropFirst(3)).trimmingCharacters(in: .whitespaces)
+    }
+
+    func flushFence() {
+      let language = (fenceLanguage ?? "").trimmingCharacters(in: .whitespaces)
+      blocks.append(.code(id: fenceStart, language: language, source: fenceLines.joined(separator: "\n")))
+      fenceLanguage = nil
+      fenceLines = []
+    }
+
     while i < lines.count {
       let line = lines[i]
-      if line.hasPrefix("```") {
-        insideCodeFence.toggle()
-        // Render fence line itself as paragraph (preserves original inline behavior)
-        blocks.append(.paragraph(id: i, attributed: inlineAttributed(line)))
+      if let info = isFence(line) {
+        if fenceLanguage != nil {
+          flushFence()
+        } else {
+          fenceLanguage = info
+          fenceLines = []
+          fenceStart = i
+        }
         i += 1
         continue
       }
-      if insideCodeFence {
-        blocks.append(.paragraph(id: i, attributed: inlineAttributed(line)))
+      if fenceLanguage != nil {
+        fenceLines.append(line)
         i += 1
         continue
       }
@@ -155,6 +175,7 @@ struct AssistantMessage: View {
           if rowLine.trimmingCharacters(in: .whitespaces).isEmpty { break }
           if !rowLine.contains("|") { break }
           if isTableSeparator(rowLine) { break }
+          if isFence(rowLine) != nil { break }
           rows.append(splitTableRow(rowLine))
           j += 1
         }
@@ -183,6 +204,9 @@ struct AssistantMessage: View {
       }
       i += 1
     }
+    if fenceLanguage != nil {
+      flushFence()
+    }
     return blocks
   }
 
@@ -208,22 +232,7 @@ struct AssistantMessage: View {
           case .text(_, let text):
             VStack(alignment: .leading, spacing: 8) {
               ForEach(parseBlocks(text)) { block in
-                switch block {
-                case .paragraph(_, let attributed):
-                  Text(attributed)
-                    .font(.footnote)
-                    .lineSpacing(3)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                case .heading(_, _, let attributed):
-                  Text(attributed)
-                    .lineSpacing(3)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 12)
-                case .table(let table):
-                  MarkdownTableView(table: table)
-                }
+                MarkdownBlockView(block: block)
               }
             }
           case .activity(let id, let items):
@@ -249,32 +258,13 @@ struct AssistantMessage: View {
 
         VStack(alignment: .leading, spacing: 8) {
           ForEach(parseBlocks(message.text)) { block in
-            switch block {
-            case .paragraph(_, let attributed):
-              Text(attributed)
-                .font(.footnote)
-                .lineSpacing(3)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            case .heading(_, _, let attributed):
-              Text(attributed)
-                .lineSpacing(3)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 12)
-            case .table(let table):
-              MarkdownTableView(table: table)
-            }
+            MarkdownBlockView(block: block)
           }
         }
       }
 
       if let error = message.error {
         ErrorBlock(error: error)
-      }
-
-      if let code = message.code {
-        CodeBlock(language: code.language, source: code.source)
       }
 
       if !message.isStreaming && message.id == store.messages.last?.id && store.generatingMessageId == nil {
@@ -326,12 +316,39 @@ private enum MarkdownBlock: Identifiable {
   case paragraph(id: Int, attributed: AttributedString)
   case heading(id: Int, level: Int, attributed: AttributedString)
   case table(MarkdownTable)
+  case code(id: Int, language: String, source: String)
 
   var id: String {
     switch self {
     case .paragraph(let id, _): return "p-\(id)"
     case .heading(let id, _, _): return "h-\(id)"
     case .table(let t): return "t-\(t.id)"
+    case .code(let id, _, _): return "c-\(id)"
+    }
+  }
+}
+
+private struct MarkdownBlockView: View {
+  let block: MarkdownBlock
+
+  var body: some View {
+    switch block {
+    case .paragraph(_, let attributed):
+      Text(attributed)
+        .font(.footnote)
+        .lineSpacing(3)
+        .textSelection(.enabled)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    case .heading(_, _, let attributed):
+      Text(attributed)
+        .lineSpacing(3)
+        .textSelection(.enabled)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 12)
+    case .table(let table):
+      MarkdownTableView(table: table)
+    case .code(_, let language, let source):
+      CodeBlock(language: language, source: source)
     }
   }
 }

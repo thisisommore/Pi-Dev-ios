@@ -203,11 +203,8 @@ extension ChatStore {
       }
       message.segments = segments
       message.text = built.text
-      message.code = built.code
+      message.code = nil
     } else {
-      let (textWithoutCode, code) = stripFirstCodeBlock(from: message.text)
-      message.code = code
-      message.text = textWithoutCode.trimmingCharacters(in: .whitespacesAndNewlines)
       if !terminalRuns.isEmpty {
         message.segments = terminalRuns.map { .terminal($0) }
       }

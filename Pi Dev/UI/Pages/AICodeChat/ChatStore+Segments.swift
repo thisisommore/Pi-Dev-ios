@@ -7,8 +7,7 @@ import Observation
 import SwiftUI
 
 extension ChatStore {
-  /// Builds ordered render segments from message content blocks, extracting the
-  /// first fenced code block into a dedicated code view. Returns nil when the
+  /// Builds ordered render segments from message content blocks. Returns nil when the
   /// content is missing, so callers keep whatever was accumulated while streaming.
   func buildSegments(from content: AgentMessage.MessageContent?) -> (segments: [ChatMessage.Segment], text: String, code: (language: String, source: String)?)? {
     guard let content else { return nil }
@@ -22,19 +21,10 @@ extension ChatStore {
     }
 
     var segments: [ChatMessage.Segment] = []
-    var code: (language: String, source: String)? = nil
     for block in blocks {
       switch block {
       case .text(let rawText):
-        var text = rawText
-        if code == nil {
-          let (stripped, found) = stripFirstCodeBlock(from: text)
-          if let found {
-            code = found
-            text = stripped
-          }
-        }
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty {
           segments.append(.text(text: trimmed))
         }
@@ -51,7 +41,7 @@ extension ChatStore {
       return text
     }.joined(separator: "\n\n")
 
-    return (segments, text, code)
+    return (segments, text, nil)
   }
 
   func stripFirstCodeBlock(from text: String) -> (text: String, code: (language: String, source: String)?) {

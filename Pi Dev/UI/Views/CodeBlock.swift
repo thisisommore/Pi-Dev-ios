@@ -9,10 +9,18 @@ struct CodeBlock: View {
   let language: String
   let source: String
 
+  private var languageLabel: String {
+    let trimmed = language.trimmingCharacters(in: .whitespacesAndNewlines)
+    if trimmed.isEmpty || trimmed.contains(where: { $0.isWhitespace }) {
+      return "TEXT"
+    }
+    return trimmed.uppercased()
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       HStack {
-        Text(language.uppercased())
+        Text(languageLabel)
           .font(.system(size: 9, weight: .heavy))
           .foregroundStyle(.secondary)
         Spacer()
