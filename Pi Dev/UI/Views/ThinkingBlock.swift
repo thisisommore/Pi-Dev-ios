@@ -5,10 +5,25 @@
 
 import SwiftUI
 import Combine
+import UIKit
 
 struct ThinkingBlock: View {
   let thinking: Thinking
+  var isStreaming = false
   @State private var showSheet = false
+  @State private var textHeight: CGFloat = 0
+
+  private var lineHeight: CGFloat {
+    UIFont.preferredFont(forTextStyle: .caption1).lineHeight
+  }
+
+  private var viewportHeight: CGFloat { lineHeight * 2 }
+
+  /// While live and taller than 2 lines, pin to the newest text. When it stops, first 2 lines.
+  private var slideOffset: CGFloat {
+    guard isStreaming, textHeight > viewportHeight else { return 0 }
+    return viewportHeight - textHeight
+  }
 
   var body: some View {
     Button {
@@ -17,8 +32,22 @@ struct ThinkingBlock: View {
       Text(thinking.summary)
         .font(.caption)
         .foregroundStyle(.secondary)
-        .lineLimit(2)
-        .padding(.vertical, 0)
+        .multilineTextAlignment(.leading)
+        .fixedSize(horizontal: false, vertical: true)
+        .background {
+          GeometryReader { geo in
+            Color.clear
+              .onAppear { textHeight = geo.size.height }
+              .onChange(of: geo.size.height) { _, height in
+                textHeight = height
+              }
+          }
+        }
+        .offset(y: slideOffset)
+        .animation(.linear(duration: 0.2), value: slideOffset)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(height: viewportHeight, alignment: .top)
+        .clipped()
         .contentShape(.rect)
     }
     .buttonStyle(.plain)

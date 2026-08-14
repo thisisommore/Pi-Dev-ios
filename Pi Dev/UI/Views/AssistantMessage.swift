@@ -198,9 +198,7 @@ struct AssistantMessage: View {
       }
 
       if let thinking = message.thinking {
-        ThinkingBlock(thinking: thinking)
-          .transaction { $0.animation = nil }
-          .animation(nil, value: self.store.expandedToolGroups)
+        ThinkingBlock(thinking: thinking, isStreaming: message.isStreaming)
       }
       if !message.segments.isEmpty {
         ForEach(displaySections) { section in
