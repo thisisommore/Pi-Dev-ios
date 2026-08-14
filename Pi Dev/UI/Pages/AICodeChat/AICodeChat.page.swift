@@ -9,6 +9,7 @@ import Combine
 struct AICodeChatView: View {
   @State private var sidebarStore: SidebarStore
   @State private var showSidebar = false
+  @State private var showRemoteFolder = false
 
   init() {
     // Default arg evaluation is nonisolated; construct on the MainActor here instead.
@@ -22,7 +23,7 @@ struct AICodeChatView: View {
   var body: some View {
     GeometryReader { geometry in
       ZStack {
-        Sidebar(store: sidebarStore)
+        Sidebar(store: sidebarStore, showRemoteFolder: $showRemoteFolder)
           .frame(width: geometry.size.width * 0.8)
           .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -56,6 +57,12 @@ struct AICodeChatView: View {
           showSidebar = false
         }
       }
+    }
+    .sheet(isPresented: $showRemoteFolder) {
+      RemoteFolderSheet()
+        .presentationDetents([.large])
+        .presentationBackground(.thinMaterial)
+        .presentationCornerRadius(32)
     }
   }
 }

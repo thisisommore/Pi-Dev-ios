@@ -5,10 +5,15 @@
 
 import SwiftUI
 
+private enum RemoteFolderLayout {
+  case grid, list
+}
+
 struct RemoteFolderSheet: View {
   @Environment(\.dismiss) private var dismiss
   @State private var path: [RemoteEntry] = [RemoteFolderMock.home]
   @State private var selectedIds: Set<String> = []
+  @State private var layout: RemoteFolderLayout = .grid
 
   private var current: RemoteEntry { path.last ?? RemoteFolderMock.home }
 
@@ -62,59 +67,113 @@ struct RemoteFolderSheet: View {
       .padding(.top, 12)
       .padding(.bottom, 8)
 
-      if !selectedIds.isEmpty {
-        Text("\(selectedIds.count) selected")
-          .font(.caption.weight(.medium))
-          .foregroundStyle(.secondary)
-          .padding(.horizontal, 20)
-          .padding(.bottom, 8)
+      HStack {
+        if !selectedIds.isEmpty {
+          Text("\(selectedIds.count) selected")
+            .font(.caption.weight(.medium))
+            .foregroundStyle(.secondary)
+        }
+        Spacer(minLength: 0)
+        Picker("Layout", selection: $layout) {
+          Image(systemName: "square.grid.2x2").tag(RemoteFolderLayout.grid)
+          Image(systemName: "list.bullet").tag(RemoteFolderLayout.list)
+        }
+        .pickerStyle(.segmented)
+        .frame(width: 88)
       }
+      .padding(.horizontal, 20)
+      .padding(.bottom, 8)
 
       ScrollView {
-        LazyVStack(spacing: 0) {
-          ForEach(Array(items.enumerated()), id: \.element.id) { index, entry in
-            Button {
-              tap(entry)
-            } label: {
-              HStack(spacing: 12) {
-                Image(systemName: entry.isFolder ? "folder.fill" : "doc")
-                  .font(.system(size: 18, weight: .regular))
-                  .foregroundStyle(entry.isFolder ? appIcon : appLabel)
-                  .frame(width: 28)
-
-                Text(entry.name)
-                  .font(.subheadline)
-                  .foregroundStyle(appLabel)
-                  .lineLimit(1)
-                  .frame(maxWidth: .infinity, alignment: .leading)
-
-                if entry.isFolder {
-                  Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.tertiary)
-                } else if selectedIds.contains(entryPath(entry)) {
-                  Image(systemName: "checkmark")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(appColor)
-                }
-              }
-              .padding(.horizontal, 16)
-              .padding(.vertical, 12)
-              .contentShape(.rect)
-            }
-            .buttonStyle(.plain)
-
-            if index < items.count - 1 {
-              Divider()
-                .opacity(0.5)
-                .padding(.leading, 56)
-            }
-          }
+        if layout == .grid {
+          gridContent
+        } else {
+          listContent
         }
-        .padding(.horizontal, 8)
-        .padding(.bottom, 20)
       }
     }
+  }
+
+  private var gridContent: some View {
+    LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: 16)], spacing: 16) {
+      ForEach(items) { entry in
+        Button {
+          tap(entry)
+        } label: {
+          VStack(spacing: 8) {
+            ZStack(alignment: .topTrailing) {
+              Image(systemName: entry.isFolder ? "folder.fill" : "doc")
+                .font(.system(size: 44, weight: .regular))
+                .foregroundStyle(entry.isFolder ? appIcon : appLabel)
+                .frame(width: 72, height: 56)
+
+              if !entry.isFolder, selectedIds.contains(entryPath(entry)) {
+                Image(systemName: "checkmark.circle.fill")
+                  .font(.system(size: 16, weight: .semibold))
+                  .foregroundStyle(appColor)
+                  .offset(x: 6, y: -4)
+              }
+            }
+            Text(entry.name)
+              .font(.caption)
+              .foregroundStyle(appLabel)
+              .lineLimit(2)
+              .multilineTextAlignment(.center)
+              .frame(maxWidth: .infinity)
+          }
+          .padding(.vertical, 8)
+          .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+      }
+    }
+    .padding(.horizontal, 20)
+    .padding(.bottom, 20)
+  }
+
+  private var listContent: some View {
+    LazyVStack(spacing: 0) {
+      ForEach(Array(items.enumerated()), id: \.element.id) { index, entry in
+        Button {
+          tap(entry)
+        } label: {
+          HStack(spacing: 12) {
+            Image(systemName: entry.isFolder ? "folder.fill" : "doc")
+              .font(.system(size: 18, weight: .regular))
+              .foregroundStyle(entry.isFolder ? appIcon : appLabel)
+              .frame(width: 28)
+
+            Text(entry.name)
+              .font(.subheadline)
+              .foregroundStyle(appLabel)
+              .lineLimit(1)
+              .frame(maxWidth: .infinity, alignment: .leading)
+
+            if entry.isFolder {
+              Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.tertiary)
+            } else if selectedIds.contains(entryPath(entry)) {
+              Image(systemName: "checkmark")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(appColor)
+            }
+          }
+          .padding(.horizontal, 16)
+          .padding(.vertical, 12)
+          .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+
+        if index < items.count - 1 {
+          Divider()
+            .opacity(0.5)
+            .padding(.leading, 56)
+        }
+      }
+    }
+    .padding(.horizontal, 8)
+    .padding(.bottom, 20)
   }
 
   private var breadcrumb: String {

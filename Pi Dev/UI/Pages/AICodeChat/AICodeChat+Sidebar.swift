@@ -8,9 +8,9 @@ import Combine
 
 struct Sidebar: View {
   @Bindable var store: SidebarStore
+  @Binding var showRemoteFolder: Bool
   @AppStorage("piServerBaseURL") private var serverURL = ""
   @AppStorage("piAuthToken") private var authToken = ""
-  @State private var showRemoteFolder = false
 
   var body: some View {
     ZStack {
@@ -33,6 +33,7 @@ struct Sidebar: View {
             Image(systemName: "folder")
               .font(.system(size: 16, weight: .light))
               .frame(width: 36, height: 36)
+              .contentShape(Circle())
           }
           .buttonStyle(.plain)
           .glassEffect(.regular.interactive(), in: .circle)
@@ -169,12 +170,6 @@ struct Sidebar: View {
         .buttonStyle(.plain)
         .padding(.bottom, 8)
       }
-    }
-    .sheet(isPresented: $showRemoteFolder) {
-      RemoteFolderSheet()
-        .presentationDetents([.large])
-        .presentationBackground(.thinMaterial)
-        .presentationCornerRadius(32)
     }
   }
 }
