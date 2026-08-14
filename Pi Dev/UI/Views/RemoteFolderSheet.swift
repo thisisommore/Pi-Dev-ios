@@ -15,7 +15,6 @@ struct RemoteFolderSheet: View {
   @Environment(\.dismiss) private var dismiss
   @State private var dirStack: [String] = ["~"]
   @State private var currentPath = ""
-  @State private var homePath: String?
   @State private var items: [RemoteFileEntry] = []
   @State private var selectedIds: Set<String> = []
   @State private var layout: RemoteFolderLayout = .grid
@@ -30,58 +29,18 @@ struct RemoteFolderSheet: View {
         .frame(maxWidth: .infinity)
         .padding(.top, 10)
 
-      HStack(spacing: 12) {
-        if dirStack.count > 1 {
-          Button {
-            dirStack.removeLast()
-            Task { await load() }
-          } label: {
-            Image(systemName: "chevron.left")
-              .font(.system(size: 16, weight: .semibold))
-              .foregroundStyle(appLabel)
-              .frame(width: 32, height: 32)
-          }
-          .buttonStyle(.plain)
-        }
+      header
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 10)
 
-        VStack(alignment: .leading, spacing: 2) {
-          Text(titleName)
-            .font(.title3.weight(.bold))
-            .lineLimit(1)
-          Text(breadcrumb)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-        }
-
-        Spacer(minLength: 0)
-
-        Button("Done") {
-          dismiss()
-        }
-        .font(.body.weight(.semibold))
-        .foregroundStyle(appLabel)
+      if !selectedIds.isEmpty {
+        Text("\(selectedIds.count) selected")
+          .font(.caption.weight(.medium))
+          .foregroundStyle(.secondary)
+          .padding(.horizontal, 20)
+          .padding(.bottom, 8)
       }
-      .padding(.horizontal, 20)
-      .padding(.top, 12)
-      .padding(.bottom, 8)
-
-      HStack {
-        if !selectedIds.isEmpty {
-          Text("\(selectedIds.count) selected")
-            .font(.caption.weight(.medium))
-            .foregroundStyle(.secondary)
-        }
-        Spacer(minLength: 0)
-        Picker("Layout", selection: $layout) {
-          Image(systemName: "square.grid.2x2").tag(RemoteFolderLayout.grid)
-          Image(systemName: "list.bullet").tag(RemoteFolderLayout.list)
-        }
-        .pickerStyle(.segmented)
-        .frame(width: 88)
-      }
-      .padding(.horizontal, 20)
-      .padding(.bottom, 8)
 
       Group {
         if isLoading && items.isEmpty {
@@ -120,22 +79,63 @@ struct RemoteFolderSheet: View {
     }
   }
 
+  private var header: some View {
+    ZStack {
+      Text(titleName)
+        .font(.headline.weight(.semibold))
+        .foregroundStyle(appLabel)
+        .lineLimit(1)
+        .padding(.horizontal, 96)
+
+      HStack(spacing: 10) {
+        if dirStack.count > 1 {
+          glassIcon("chevron.left") {
+            dirStack.removeLast()
+            Task { await load() }
+          }
+        } else {
+          Color.clear.frame(width: 40, height: 40)
+        }
+
+        Spacer(minLength: 0)
+
+        GlassEffectContainer(spacing: 10) {
+          HStack(spacing: 10) {
+            glassIcon(layout == .grid ? "square.grid.2x2" : "list.bullet") {
+              layout = layout == .grid ? .list : .grid
+            }
+            glassIcon("xmark") {
+              dismiss()
+            }
+          }
+        }
+      }
+    }
+  }
+
+  private func glassIcon(_ systemName: String, action: @escaping () -> Void) -> some View {
+    Button(action: action) {
+      Image(systemName: systemName)
+        .font(.system(size: 15, weight: .semibold))
+        .foregroundStyle(appIcon)
+        .frame(width: 40, height: 40)
+        .contentShape(Circle())
+    }
+    .buttonStyle(.plain)
+    .glassEffect(.regular.interactive(), in: .circle)
+  }
+
+  private var folderBlue: Color {
+    Color(red: 0.35, green: 0.68, blue: 0.98)
+  }
+
   private var titleName: String {
     if dirStack.count == 1 { return "Home" }
     return (currentPath as NSString).lastPathComponent
   }
 
-  private var breadcrumb: String {
-    guard !currentPath.isEmpty else { return "Home" }
-    if let homePath, currentPath.hasPrefix(homePath) {
-      let rest = String(currentPath.dropFirst(homePath.count))
-      return rest.isEmpty ? "~" : "~\(rest)"
-    }
-    return currentPath
-  }
-
   private var gridContent: some View {
-    LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: 16)], spacing: 16) {
+    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3), spacing: 20) {
       ForEach(items) { entry in
         Button {
           tap(entry)
@@ -143,14 +143,14 @@ struct RemoteFolderSheet: View {
           VStack(spacing: 8) {
             ZStack(alignment: .topTrailing) {
               Image(systemName: entry.isFolder ? "folder.fill" : "doc")
-                .font(.system(size: 44, weight: .regular))
-                .foregroundStyle(entry.isFolder ? appIcon : appLabel)
+                .font(.system(size: 48, weight: .regular))
+                .foregroundStyle(entry.isFolder ? folderBlue : appIcon)
                 .frame(width: 72, height: 56)
 
               if !entry.isFolder, selectedIds.contains(entry.path) {
                 Image(systemName: "checkmark.circle.fill")
                   .font(.system(size: 16, weight: .semibold))
-                  .foregroundStyle(appColor)
+                  .foregroundStyle(folderBlue)
                   .offset(x: 6, y: -4)
               }
             }
@@ -161,7 +161,7 @@ struct RemoteFolderSheet: View {
               .multilineTextAlignment(.center)
               .frame(maxWidth: .infinity)
           }
-          .padding(.vertical, 8)
+          .padding(.vertical, 4)
           .contentShape(.rect)
         }
         .buttonStyle(.plain)
@@ -179,8 +179,8 @@ struct RemoteFolderSheet: View {
         } label: {
           HStack(spacing: 12) {
             Image(systemName: entry.isFolder ? "folder.fill" : "doc")
-              .font(.system(size: 18, weight: .regular))
-              .foregroundStyle(entry.isFolder ? appIcon : appLabel)
+              .font(.system(size: 22, weight: .regular))
+              .foregroundStyle(entry.isFolder ? folderBlue : appIcon)
               .frame(width: 28)
 
             Text(entry.name)
@@ -196,7 +196,7 @@ struct RemoteFolderSheet: View {
             } else if selectedIds.contains(entry.path) {
               Image(systemName: "checkmark")
                 .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(appColor)
+                .foregroundStyle(folderBlue)
             }
           }
           .padding(.horizontal, 16)
@@ -236,9 +236,6 @@ struct RemoteFolderSheet: View {
     do {
       let result = try await files.listFiles(dir: dir)
       currentPath = result.path ?? dir
-      if homePath == nil {
-        homePath = result.path
-      }
       items = result.entries ?? []
     } catch {
       errorMessage = error.localizedDescription
