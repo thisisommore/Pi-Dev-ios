@@ -149,22 +149,18 @@ extension ChatStore {
   }
 
   func resetToSession(title: String) async {
-    await MainActor.run {
-      withAnimation(.snappy) {
-        messages = []
-        usedTokens = 0
-        chatTitle = title
-        isResponding = false
-        draft = ""
-        editingMessageId = nil
-        pastedItems = []
-        contextFiles = []
-        includedRepo = nil
-        workingDir = nil
-        messageQueue = []
-        expandedToolGroups = []
-      }
-    }
+    messages = []
+    usedTokens = 0
+    chatTitle = title
+    isResponding = false
+    draft = ""
+    editingMessageId = nil
+    pastedItems = []
+    contextFiles = []
+    includedRepo = nil
+    workingDir = nil
+    messageQueue = []
+    expandedToolGroups = []
   }
 
   func renameSession(to newTitle: String) async {

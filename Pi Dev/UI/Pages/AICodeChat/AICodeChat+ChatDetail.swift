@@ -27,15 +27,13 @@ struct ChatDetailView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     .overlay(alignment: .top) {
-      if store.messages.isEmpty {
-        Header(
-          store: store,
-          showModelSheet: $showModelSheet,
-          showSidebar: $showSidebar,
-          onNewChat: onNewChat
-        )
-        .safeAreaPadding(.top)
-      }
+      Header(
+        store: store,
+        showModelSheet: $showModelSheet,
+        showSidebar: $showSidebar,
+        onNewChat: onNewChat
+      )
+      .safeAreaPadding(.top)
     }
     .safeAreaInset(edge: .bottom, spacing: 0) {
       VStack(alignment: .leading, spacing: 0) {

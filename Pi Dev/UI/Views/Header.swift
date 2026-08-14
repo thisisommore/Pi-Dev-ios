@@ -19,8 +19,7 @@ struct Header: View {
   }
 
   var body: some View {
-    GlassEffectContainer(spacing: 12) {
-      HStack(spacing: 12) {
+    HStack(spacing: 12) {
         Button {
           withAnimation(.snappy) {
             showSidebar.toggle()
@@ -60,7 +59,6 @@ struct Header: View {
         }
         .buttonStyle(.plain)
         .tint(appIcon)
-        .animation(.linear(duration: 0), value: store.chatTitle)
         .glassEffect(.regular.interactive(), in: .capsule)
 
         Spacer(minLength: 0)
@@ -84,10 +82,9 @@ struct Header: View {
         .buttonStyle(.plain)
         .glassEffect(.regular.interactive())
       }
-      .padding(.horizontal, 16)
-      .padding(.top, 6)
-      .padding(.bottom, 10)
-    }
+    .padding(.horizontal, 16)
+    .padding(.top, 6)
+    .padding(.bottom, 10)
     .foregroundStyle(appLabel)
     .blur(radius: store.editingMessageId != nil ? 10 : 0)
     .allowsHitTesting(store.editingMessageId == nil)

@@ -18,14 +18,6 @@ struct ChatMessagesView: UIViewControllerRepresentable {
 
   func updateUIViewController(_ uiViewController: ChatMessagesVC, context: Context) {
     uiViewController.store = store
-    uiViewController.installHeader(
-      Header(
-        store: store,
-        showModelSheet: $showModelSheet,
-        showSidebar: $showSidebar,
-        onNewChat: onNewChat
-      )
-    )
     uiViewController.syncList()
   }
 }
