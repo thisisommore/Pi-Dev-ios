@@ -30,19 +30,13 @@ final class ChatStore: Identifiable {
   /// Session id used when writing chat cache (owned by SidebarStore).
   var cacheSessionId: String? = nil
   /// Called when the first turn of a new (previously unselected) chat commits on the server.
-  /// SidebarStore sets this to adopt the new sessionId and refresh the list.
   var onNewSessionAdopted: ((String) -> Void)?
-  /// Called after any prompt stream completes to refresh sidebar via RPC.
-  /// SidebarStore sets this to trigger loadSessions() on the main actor.
+  /// Called after any prompt stream completes to refresh the sidebar list.
   var onStreamCompleted: (() async -> Void)?
-  /// Called as soon as the first token arrives for a new-chat draft, so the
-  /// sidebar can appear via RPC without waiting for the full stream.
-  var onFirstTokenForNewChat: (() async -> Void)?
-  /// Called when a new-chat draft needs a server session created atomically
-  /// before the first prompt. SidebarStore creates the session via RPC and
-  /// returns the new sessionId. This is the only place new_session is issued
-  /// for a draft, eliminating the newChat/prompt race.
+  /// Called when a new-chat draft needs a server session before the first prompt.
   var createServerSessionForDraft: (() async -> String?)?
+  /// Sidebar updates the session row. `isRename` maps to `set_session_name`.
+  var onDisplayTitleChanged: ((_ title: String, _ isRename: Bool) -> Void)?
 
   @ObservationIgnored
   let rpcClient: any PiRPCP

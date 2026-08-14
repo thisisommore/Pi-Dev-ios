@@ -173,13 +173,14 @@ extension ChatStore {
     let oldTitle = chatTitle
     // Optimistic update for instant UI.
     chatTitle = trimmed
+    onDisplayTitleChanged?(trimmed, true)
     do {
       _ = try await rpcClient.setSessionName(trimmed)
-      // Persist locally and refresh server state (sessionName).
       persistChatCache()
       await syncStateFromServer()
     } catch {
       chatTitle = oldTitle
+      onDisplayTitleChanged?(oldTitle, true)
     }
   }
 

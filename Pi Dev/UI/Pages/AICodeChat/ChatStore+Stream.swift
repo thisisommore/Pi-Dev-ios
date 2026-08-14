@@ -109,7 +109,6 @@ extension ChatStore {
     var thinkingStartTime: Date?
     var currentIndex = messageIndex
     var finalizedCurrentTurn = false
-    var didTriggerFirstTokenRefresh = false
 
     func updateThinkingSeconds() {
       guard let start = thinkingStartTime else { return }
@@ -172,15 +171,6 @@ extension ChatStore {
               $0.segments[lastIndex] = .text(id: segmentId, text: existing + text)
             } else {
               $0.segments.append(.text(text: text))
-            }
-          }
-          // As soon as first token arrives for a new-chat (unselected draft),
-          // trigger sidebar refresh via RPC so it appears without waiting
-          // for the full stream to complete.
-          if !didTriggerFirstTokenRefresh, expectedSessionId == nil, let onFirstTokenForNewChat {
-            didTriggerFirstTokenRefresh = true
-            Task { @MainActor in
-              await onFirstTokenForNewChat()
             }
           }
         case .thinkingStart:
@@ -320,36 +310,19 @@ extension ChatStore {
       updateMessage(at: currentIndex) { $0.isStreaming = false }
     }
     await syncStateFromServer()
-    // First turn of a new chat: adopt server session so sidebar updates.
-    // Only adopt if we were previously unselected (new chat draft).
     if expectedSessionId == nil {
       do {
         let state = try await rpcClient.getState()
         if let newId = state.data?.sessionId, !newId.isEmpty {
-          // Don't set cache here — let SidebarStore adopt atomically via loadSessions
           await MainActor.run { self.onNewSessionAdopted?(newId) }
         }
-      } catch {
-        // Sidebar still refreshes via onStreamCompleted below.
-      }
+      } catch {}
     }
-    // Always refresh sidebar via RPC after a prompt so the new chat appears
-    // even when newChat had already selected the empty session (title update).
     if let onStreamCompleted {
       await onStreamCompleted()
     }
-    // Only persist if still the same session.
     if let expectedSessionId, self.cacheSessionId != expectedSessionId { return }
     persistChatCache()
-    // The server generates the session title asynchronously after a run;
-    // refresh once more shortly after to pick it up.
-    let persistSession = expectedSessionId ?? self.cacheSessionId
-    Task { @MainActor [weak self] in
-      try? await Task.sleep(for: .seconds(10))
-      guard let self, self.cacheSessionId == persistSession else { return }
-      await self.syncStateFromServer()
-      self.persistChatCache()
-    }
     processQueue()
   }
 

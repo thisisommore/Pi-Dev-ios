@@ -106,7 +106,11 @@ extension ChatStore {
   }
 
   func sendNow(_ text: String, repo: IncludedRepo? = nil) {
-    if messages.isEmpty { chatTitle = String(text.prefix(34)) }
+    if messages.isEmpty {
+      let title = String(text.prefix(34))
+      chatTitle = title
+      onDisplayTitleChanged?(title, false)
+    }
 
     withAnimation(.snappy) {
       messages.append(ChatMessage(role: .user, text: text, tokens: 180))

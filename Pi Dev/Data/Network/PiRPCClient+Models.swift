@@ -53,6 +53,36 @@ struct SessionInfo: Identifiable, Decodable, Sendable, Equatable {
   let messageCount: Int
   let firstMessage: String?
   let allMessagesText: String?
+
+  /// `name` (set_session_name) wins; otherwise truncated first user message.
+  var displayTitle: String {
+    if let name = name?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
+      return name
+    }
+    if let first = firstMessage?.trimmingCharacters(in: .whitespacesAndNewlines), !first.isEmpty {
+      return String(first.prefix(34))
+    }
+    return "New chat"
+  }
+
+  func replacing(
+    name: String? = nil,
+    firstMessage: String? = nil,
+    modified: String? = nil,
+    messageCount: Int? = nil
+  ) -> SessionInfo {
+    SessionInfo(
+      path: path,
+      id: id,
+      cwd: cwd,
+      name: name ?? self.name,
+      created: created,
+      modified: modified ?? self.modified,
+      messageCount: messageCount ?? self.messageCount,
+      firstMessage: firstMessage ?? self.firstMessage,
+      allMessagesText: allMessagesText
+    )
+  }
 }
 
 struct EmptyResponse: Decodable, Sendable {}

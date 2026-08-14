@@ -44,9 +44,7 @@ struct Sidebar: View {
 
         ScrollView {
           LazyVStack(spacing: 0) {
-            // Optimistic draft for new chat: show immediately after first message
-            // before server has returned the new sessionId. Replaced by real
-            // entry once adoptNewChatSession loads sessions.
+            // Draft row until new_session returns an id.
             if store.selectedSessionId == nil, !store.activeChat.messages.isEmpty {
               Button {} label: {
                 HStack(spacing: 10) {

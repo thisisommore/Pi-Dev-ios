@@ -42,6 +42,7 @@ extension ChatStore {
        !name.isEmpty,
        chatTitle != name {
       self.chatTitle = name
+      onDisplayTitleChanged?(name, true)
     }
     let levels = self.buildSupportedThinkingLevels(from: state.model?.thinkingLevelMap)
     if supportedThinkingLevels.map(\.id) != levels.map(\.id) {
