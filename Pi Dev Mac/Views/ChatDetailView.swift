@@ -50,15 +50,6 @@ struct ChatDetailView: View {
                 }
                 .help("Open folder")
             }
-
-            ToolbarItem(placement: .primaryAction) {
-                ContextGauge(
-                    fraction: store.contextFraction,
-                    used: store.usedTokens,
-                    window: store.contextWindow
-                )
-                .frame(width: 28, height: 28)
-            }
         }
     }
 
