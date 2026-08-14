@@ -10,6 +10,7 @@ struct Sidebar: View {
   @Bindable var store: SidebarStore
   @AppStorage("piServerBaseURL") private var serverURL = ""
   @AppStorage("piAuthToken") private var authToken = ""
+  @State private var showRemoteFolder = false
 
   var body: some View {
     ZStack {
@@ -23,20 +24,18 @@ struct Sidebar: View {
 
       VStack(spacing: 0) {
         HStack {
+          Text("πcode")
+            .font(.largeTitle)
+          Spacer()
           Button {
-            Task { @MainActor in
-              await store.newChat()
-            }
+            showRemoteFolder = true
           } label: {
-            Image(systemName: "square.and.pencil")
+            Image(systemName: "folder")
               .font(.system(size: 16, weight: .light))
               .frame(width: 36, height: 36)
           }
           .buttonStyle(.plain)
           .glassEffect(.regular.interactive(), in: .circle)
-          Spacer()
-          Text("πcode")
-            .font(.largeTitle)
         }
         .padding(.horizontal, 16)
         .padding(.top, 8)
@@ -170,6 +169,12 @@ struct Sidebar: View {
         .buttonStyle(.plain)
         .padding(.bottom, 8)
       }
+    }
+    .sheet(isPresented: $showRemoteFolder) {
+      RemoteFolderSheet()
+        .presentationDetents([.large])
+        .presentationBackground(.thinMaterial)
+        .presentationCornerRadius(32)
     }
   }
 }

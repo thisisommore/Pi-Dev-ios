@@ -51,6 +51,17 @@
 		A1EEC88E3002339400AF36D4 /* Pi Dev MacUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Pi Dev MacUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		A1F8E1A12A4B5C6D7E8F9012 /* Exceptions for "Pi Dev" folder in "Pi Dev" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Data/Network/README.md,
+				Data/README.md,
+			);
+			target = A1A5946D2FFCD58700D00C24 /* Pi Dev */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		A1A594702FFCD58700D00C24 /* Pi Dev */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
@@ -86,17 +97,6 @@
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
-
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		A1F8E1A12A4B5C6D7E8F9012 /* Exceptions for "Pi Dev" folder in "Pi Dev" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Data/README.md,
-				Data/Network/README.md,
-			);
-			target = A1A5946D2FFCD58700D00C24 /* Pi Dev */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		A1A5946B2FFCD58700D00C24 /* Frameworks */ = {
