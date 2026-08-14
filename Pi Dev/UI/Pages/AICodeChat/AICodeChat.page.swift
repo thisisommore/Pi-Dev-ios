@@ -10,14 +10,18 @@ struct AICodeChatView: View {
   @State private var sidebarStore: SidebarStore
   @State private var showSidebar = false
   @State private var showRemoteFolder = false
+  private let files: any FilesBrowserP
 
   init() {
     // Default arg evaluation is nonisolated; construct on the MainActor here instead.
-    _sidebarStore = State(initialValue: SidebarStore())
+    let store = SidebarStore()
+    _sidebarStore = State(initialValue: store)
+    files = store.rpcClient
   }
 
-  init(sidebarStore: SidebarStore) {
+  init(sidebarStore: SidebarStore, files: (any FilesBrowserP)? = nil) {
     _sidebarStore = State(initialValue: sidebarStore)
+    self.files = files ?? sidebarStore.rpcClient
   }
 
   var body: some View {
@@ -59,7 +63,7 @@ struct AICodeChatView: View {
       }
     }
     .sheet(isPresented: $showRemoteFolder) {
-      RemoteFolderSheet(rpcClient: sidebarStore.rpcClient)
+      RemoteFolderSheet(files: files)
         .presentationDetents([.large])
         .presentationBackground(.thinMaterial)
         .presentationCornerRadius(32)
@@ -69,14 +73,20 @@ struct AICodeChatView: View {
 
 #Preview("Dark") {
   Mock {
-    AICodeChatView(sidebarStore: PreviewUtils.sidebarStore())
+    AICodeChatView(
+      sidebarStore: PreviewUtils.sidebarStore(),
+      files: MockFilesBrowser()
+    )
   }
   .preferredColorScheme(.dark)
 }
 
 #Preview("Light") {
   Mock {
-    AICodeChatView(sidebarStore: PreviewUtils.sidebarStore())
+    AICodeChatView(
+      sidebarStore: PreviewUtils.sidebarStore(),
+      files: MockFilesBrowser()
+    )
   }
   .preferredColorScheme(.light)
 }

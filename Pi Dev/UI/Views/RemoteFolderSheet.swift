@@ -10,7 +10,7 @@ private enum RemoteFolderLayout {
 }
 
 struct RemoteFolderSheet: View {
-  let rpcClient: any PiRPCP
+  let files: any FilesBrowserP
 
   @Environment(\.dismiss) private var dismiss
   @State private var dirStack: [String] = ["~"]
@@ -234,7 +234,7 @@ struct RemoteFolderSheet: View {
     isLoading = true
     errorMessage = nil
     do {
-      let result = try await rpcClient.listFiles(dir: dir)
+      let result = try await files.listFiles(dir: dir)
       currentPath = result.path ?? dir
       if homePath == nil {
         homePath = result.path
@@ -249,5 +249,5 @@ struct RemoteFolderSheet: View {
 }
 
 #Preview {
-  RemoteFolderSheet(rpcClient: PiRPCClient())
+  RemoteFolderSheet(files: MockFilesBrowser())
 }

@@ -5,10 +5,14 @@
 
 import Foundation
 
+protocol FilesBrowserP: AnyObject {
+  func listFiles(dir: String) async throws -> FilesListResponse
+}
+
 /// Shared protocol for the π JSON-RPC client.
 /// Stores should depend on `PiRPCP` so `PiRPCClient` can be replaced with a mock
 /// in previews and tests without changing call sites.
-protocol PiRPCP: AnyObject {
+protocol PiRPCP: FilesBrowserP {
   func prompt(message: String, repo: String?) async throws -> RPCResponse<PromptResponse>
   func rerun(message: String?, entryId: String?) async throws -> String?
   func steer(message: String) async throws -> RPCResponse<EmptyResponse>
@@ -23,7 +27,6 @@ protocol PiRPCP: AnyObject {
   func getCommands() async throws -> RPCResponse<CommandsResponse>
   func healthCheck() async -> Result<Void, Error>
   func listSessions() async throws -> [SessionInfo]
-  func listFiles(dir: String) async throws -> FilesListResponse
   func switchSession(path: String) async throws -> RPCResponse<EmptyResponse>
   func newSession() async throws -> RPCResponse<EmptyResponse>
   func setSessionName(_ name: String) async throws -> RPCResponse<EmptyResponse>
