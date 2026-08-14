@@ -23,6 +23,7 @@ protocol PiRPCP: AnyObject {
   func getCommands() async throws -> RPCResponse<CommandsResponse>
   func healthCheck() async -> Result<Void, Error>
   func listSessions() async throws -> [SessionInfo]
+  func listFiles(dir: String) async throws -> FilesListResponse
   func switchSession(path: String) async throws -> RPCResponse<EmptyResponse>
   func newSession() async throws -> RPCResponse<EmptyResponse>
   func setSessionName(_ name: String) async throws -> RPCResponse<EmptyResponse>

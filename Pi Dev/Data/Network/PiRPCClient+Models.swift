@@ -57,3 +57,25 @@ struct SessionInfo: Identifiable, Decodable, Sendable, Equatable {
 
 struct EmptyResponse: Decodable, Sendable {}
 
+struct FilesListResponse: Decodable, Sendable {
+  let success: Bool
+  let path: String?
+  let entries: [RemoteFileEntry]?
+  let error: String?
+}
+
+struct RemoteFileEntry: Identifiable, Decodable, Sendable, Hashable {
+  var id: String { path }
+  let name: String
+  let path: String
+  let type: Kind
+
+  enum Kind: String, Decodable, Sendable {
+    case directory
+    case file
+    case other
+  }
+
+  var isFolder: Bool { type == .directory }
+}
+

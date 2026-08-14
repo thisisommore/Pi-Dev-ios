@@ -59,7 +59,7 @@ struct AICodeChatView: View {
       }
     }
     .sheet(isPresented: $showRemoteFolder) {
-      RemoteFolderSheet()
+      RemoteFolderSheet(rpcClient: sidebarStore.rpcClient)
         .presentationDetents([.large])
         .presentationBackground(.thinMaterial)
         .presentationCornerRadius(32)

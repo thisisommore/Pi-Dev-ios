@@ -201,6 +201,29 @@ final class PiRPCClient {
     return decoded.sessions
   }
 
+  func listFiles(dir: String) async throws -> FilesListResponse {
+    let filesURL = try requireBaseURL().appendingPathComponent("files")
+    var components = URLComponents(url: filesURL, resolvingAgainstBaseURL: false)
+    components?.queryItems = [URLQueryItem(name: "dir", value: dir)]
+    guard let url = components?.url else {
+      throw RPCError(command: "list_files", message: "Invalid directory path")
+    }
+
+    var request = URLRequest(url: url)
+    request.httpMethod = "GET"
+    configureAuth(for: &request)
+
+    let (data, response) = try await urlSession.data(for: request)
+    let decoded = try? JSONDecoder().decode(FilesListResponse.self, from: data)
+    guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+      throw RPCError(command: "list_files", message: decoded?.error ?? "HTTP error")
+    }
+    guard let decoded, decoded.success else {
+      throw RPCError(command: "list_files", message: decoded?.error ?? "Unknown error")
+    }
+    return decoded
+  }
+
   func switchSession(path: String) async throws -> RPCResponse<EmptyResponse> {
     try await send(command: ["type": "switch_session", "sessionPath": path])
   }

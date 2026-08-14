@@ -10,19 +10,17 @@ private enum RemoteFolderLayout {
 }
 
 struct RemoteFolderSheet: View {
+  let rpcClient: any PiRPCP
+
   @Environment(\.dismiss) private var dismiss
-  @State private var path: [RemoteEntry] = [RemoteFolderMock.home]
+  @State private var dirStack: [String] = ["~"]
+  @State private var currentPath = ""
+  @State private var homePath: String?
+  @State private var items: [RemoteFileEntry] = []
   @State private var selectedIds: Set<String> = []
   @State private var layout: RemoteFolderLayout = .grid
-
-  private var current: RemoteEntry { path.last ?? RemoteFolderMock.home }
-
-  private var items: [RemoteEntry] {
-    current.children.sorted { lhs, rhs in
-      if lhs.isFolder != rhs.isFolder { return lhs.isFolder }
-      return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
-    }
-  }
+  @State private var isLoading = false
+  @State private var errorMessage: String?
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -33,9 +31,10 @@ struct RemoteFolderSheet: View {
         .padding(.top, 10)
 
       HStack(spacing: 12) {
-        if path.count > 1 {
+        if dirStack.count > 1 {
           Button {
-            path.removeLast()
+            dirStack.removeLast()
+            Task { await load() }
           } label: {
             Image(systemName: "chevron.left")
               .font(.system(size: 16, weight: .semibold))
@@ -46,7 +45,7 @@ struct RemoteFolderSheet: View {
         }
 
         VStack(alignment: .leading, spacing: 2) {
-          Text(current.name)
+          Text(titleName)
             .font(.title3.weight(.bold))
             .lineLimit(1)
           Text(breadcrumb)
@@ -84,14 +83,55 @@ struct RemoteFolderSheet: View {
       .padding(.horizontal, 20)
       .padding(.bottom, 8)
 
-      ScrollView {
-        if layout == .grid {
-          gridContent
+      Group {
+        if isLoading && items.isEmpty {
+          ProgressView()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if let errorMessage, items.isEmpty {
+          VStack(spacing: 12) {
+            Text(errorMessage)
+              .font(.subheadline)
+              .foregroundStyle(.secondary)
+              .multilineTextAlignment(.center)
+            Button("Retry") {
+              Task { await load() }
+            }
+          }
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+          .padding(.horizontal, 24)
         } else {
-          listContent
+          ScrollView {
+            if layout == .grid {
+              gridContent
+            } else {
+              listContent
+            }
+          }
+          .overlay {
+            if isLoading {
+              ProgressView()
+            }
+          }
         }
       }
     }
+    .task {
+      await load()
+    }
+  }
+
+  private var titleName: String {
+    if dirStack.count == 1 { return "Home" }
+    return (currentPath as NSString).lastPathComponent
+  }
+
+  private var breadcrumb: String {
+    guard !currentPath.isEmpty else { return "Home" }
+    if let homePath, currentPath.hasPrefix(homePath) {
+      let rest = String(currentPath.dropFirst(homePath.count))
+      return rest.isEmpty ? "~" : "~\(rest)"
+    }
+    return currentPath
   }
 
   private var gridContent: some View {
@@ -107,7 +147,7 @@ struct RemoteFolderSheet: View {
                 .foregroundStyle(entry.isFolder ? appIcon : appLabel)
                 .frame(width: 72, height: 56)
 
-              if !entry.isFolder, selectedIds.contains(entryPath(entry)) {
+              if !entry.isFolder, selectedIds.contains(entry.path) {
                 Image(systemName: "checkmark.circle.fill")
                   .font(.system(size: 16, weight: .semibold))
                   .foregroundStyle(appColor)
@@ -153,7 +193,7 @@ struct RemoteFolderSheet: View {
               Image(systemName: "chevron.right")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.tertiary)
-            } else if selectedIds.contains(entryPath(entry)) {
+            } else if selectedIds.contains(entry.path) {
               Image(systemName: "checkmark")
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(appColor)
@@ -176,28 +216,38 @@ struct RemoteFolderSheet: View {
     .padding(.bottom, 20)
   }
 
-  private var breadcrumb: String {
-    path.map(\.name).joined(separator: " / ")
-  }
-
-  private func entryPath(_ entry: RemoteEntry) -> String {
-    (path.map(\.name) + [entry.name]).joined(separator: "/")
-  }
-
-  private func tap(_ entry: RemoteEntry) {
+  private func tap(_ entry: RemoteFileEntry) {
     if entry.isFolder {
-      path.append(entry)
+      dirStack.append(entry.path)
+      Task { await load() }
     } else {
-      let id = entryPath(entry)
-      if selectedIds.contains(id) {
-        selectedIds.remove(id)
+      if selectedIds.contains(entry.path) {
+        selectedIds.remove(entry.path)
       } else {
-        selectedIds.insert(id)
+        selectedIds.insert(entry.path)
       }
     }
+  }
+
+  private func load() async {
+    let dir = dirStack.last ?? "~"
+    isLoading = true
+    errorMessage = nil
+    do {
+      let result = try await rpcClient.listFiles(dir: dir)
+      currentPath = result.path ?? dir
+      if homePath == nil {
+        homePath = result.path
+      }
+      items = result.entries ?? []
+    } catch {
+      errorMessage = error.localizedDescription
+      items = []
+    }
+    isLoading = false
   }
 }
 
 #Preview {
-  RemoteFolderSheet()
+  RemoteFolderSheet(rpcClient: PiRPCClient())
 }
