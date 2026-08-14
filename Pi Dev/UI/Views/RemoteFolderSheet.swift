@@ -143,9 +143,9 @@ struct RemoteFolderSheet: View {
           VStack(spacing: 8) {
             ZStack(alignment: .topTrailing) {
               Image(systemName: entry.isFolder ? "folder.fill" : "doc")
-                .font(.system(size: 48, weight: .regular))
+                .font(.system(size: 72, weight: .regular))
                 .foregroundStyle(entry.isFolder ? folderBlue : appIcon)
-                .frame(width: 72, height: 56)
+                .frame(width: 72, height: 66)
 
               if !entry.isFolder, selectedIds.contains(entry.path) {
                 Image(systemName: "checkmark.circle.fill")
