@@ -25,6 +25,7 @@ final class ChatStore: Identifiable {
   var pastedItems: [PastedItem] = []
   var contextFiles: [ContextFile] = []
   var includedRepo: IncludedRepo? = nil
+  var workingDir: String? = nil
   var messageQueue: [String] = []
   /// Session id used when writing chat cache (owned by SidebarStore).
   var cacheSessionId: String? = nil
@@ -99,6 +100,7 @@ final class ChatStore: Identifiable {
     pastedItems = []
     contextFiles = []
     includedRepo = nil
+    workingDir = nil
     messageQueue = []
     generatingMessageId = nil
     expandedToolGroups = []

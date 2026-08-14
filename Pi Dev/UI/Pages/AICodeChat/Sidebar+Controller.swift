@@ -339,6 +339,7 @@ final class SidebarStore {
         activeChat.pastedItems = []
         activeChat.contextFiles = []
         activeChat.includedRepo = nil
+        activeChat.workingDir = nil
         activeChat.messageQueue = []
       }
     }

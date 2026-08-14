@@ -18,6 +18,7 @@ extension ChatStore {
       pastedItems = []
       contextFiles = []
       includedRepo = nil
+      workingDir = nil
       messageQueue = []
       expandedToolGroups = []
     }
@@ -32,6 +33,7 @@ extension ChatStore {
       pastedItems = []
       contextFiles = []
       includedRepo = nil
+      workingDir = nil
       messageQueue = []
       expandedToolGroups = []
     }

@@ -63,7 +63,10 @@ struct AICodeChatView: View {
       }
     }
     .sheet(isPresented: $showRemoteFolder) {
-      RemoteFolderSheet(files: files)
+      RemoteFolderSheet(files: files) { path in
+        await sidebarStore.newChat()
+        sidebarStore.activeChat.workingDir = path
+      }
         .presentationDetents([.large])
         .presentationBackground(.thinMaterial)
         .presentationCornerRadius(32)

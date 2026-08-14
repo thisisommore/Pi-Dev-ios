@@ -99,9 +99,10 @@ final class PiRPCClient {
 
   // MARK: - Typed commands
 
-  func prompt(message: String, repo: String? = nil) async throws -> RPCResponse<PromptResponse> {
+  func prompt(message: String, repo: String? = nil, dir: String? = nil) async throws -> RPCResponse<PromptResponse> {
     var command: [String: Any] = ["type": "prompt", "message": message]
     if let repo { command["repo"] = repo }
+    if let dir { command["dir"] = dir }
     return try await send(command: command)
   }
 

@@ -11,7 +11,7 @@ extension PiRPCClient {
   /// First tries Server-Sent Events on `baseURL/events`.  If the server does not
   /// support SSE, falls back to polling `get_last_assistant_text` and
   /// `get_messages` until the agent stops streaming.
-  func streamEvents(forPrompt promptText: String, repo: String? = nil, onEntryId: (@MainActor (String?) -> Void)? = nil) -> AsyncStream<AgentEvent> {
+  func streamEvents(forPrompt promptText: String, repo: String? = nil, dir: String? = nil, onEntryId: (@MainActor (String?) -> Void)? = nil) -> AsyncStream<AgentEvent> {
     let stream = AsyncStream<AgentEvent> { continuation in
       let task = Task { [weak self] in
         guard let self else {
@@ -29,7 +29,7 @@ extension PiRPCClient {
         }
 
         do {
-          let response = try await self.prompt(message: promptText, repo: repo)
+          let response = try await self.prompt(message: promptText, repo: repo, dir: dir)
           if let onEntryId {
             await onEntryId(response.data?.entryId)
           }

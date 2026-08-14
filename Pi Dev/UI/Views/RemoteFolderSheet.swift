@@ -11,6 +11,7 @@ private enum RemoteFolderLayout {
 
 struct RemoteFolderSheet: View {
   let files: any FilesBrowserP
+  var onOpenInFolder: ((String) async -> Void)? = nil
 
   @Environment(\.dismiss) private var dismiss
   @State private var dirStack: [String] = ["~"]
@@ -19,6 +20,7 @@ struct RemoteFolderSheet: View {
   @State private var selectedIds: Set<String> = []
   @State private var layout: RemoteFolderLayout = .grid
   @State private var isLoading = false
+  @State private var isOpening = false
   @State private var errorMessage: String?
 
   var body: some View {
@@ -85,7 +87,7 @@ struct RemoteFolderSheet: View {
         .font(.headline.weight(.semibold))
         .foregroundStyle(appLabel)
         .lineLimit(1)
-        .padding(.horizontal, 96)
+        .padding(.horizontal, 148)
 
       HStack(spacing: 10) {
         if dirStack.count > 1 {
@@ -101,6 +103,11 @@ struct RemoteFolderSheet: View {
 
         GlassEffectContainer(spacing: 10) {
           HStack(spacing: 10) {
+            glassIcon("checkmark") {
+              Task { await openCurrentFolder() }
+            }
+            .disabled(currentPath.isEmpty || isOpening || isLoading)
+            .opacity(currentPath.isEmpty || isOpening ? 0.4 : 1)
             glassIcon(layout == .grid ? "square.grid.2x2" : "list.bullet") {
               layout = layout == .grid ? .list : .grid
             }
@@ -242,6 +249,15 @@ struct RemoteFolderSheet: View {
       items = []
     }
     isLoading = false
+  }
+
+  private func openCurrentFolder() async {
+    let path = currentPath.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !path.isEmpty else { return }
+    isOpening = true
+    await onOpenInFolder?(path)
+    isOpening = false
+    dismiss()
   }
 }
 

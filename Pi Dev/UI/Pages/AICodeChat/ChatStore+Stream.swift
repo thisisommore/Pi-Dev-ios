@@ -18,7 +18,8 @@ extension ChatStore {
     // create the server session atomically before prompting. This is the
     // only place a draft creates a session, so Send cannot race newChat.
     var streamSessionId = self.cacheSessionId
-    if streamSessionId == nil, let create = createServerSessionForDraft {
+    let promptDir = workingDir
+    if streamSessionId == nil, promptDir == nil, let create = createServerSessionForDraft {
       if let newId = await create() {
         streamSessionId = newId
         // create() already set cacheSessionId and selectedSessionId via
@@ -49,6 +50,7 @@ extension ChatStore {
       rpcClient.streamEvents(
         forPrompt: userText,
         repo: repo?.url,
+        dir: promptDir,
         onEntryId: { [weak self] entryId in
           guard let self, let entryId = entryId else { return }
           // Discard entryId for stale session.
@@ -59,6 +61,9 @@ extension ChatStore {
       at: messageIndex,
       expectedSessionId: streamSessionId
     )
+    if promptDir != nil {
+      workingDir = nil
+    }
   }
 
   func streamRerun(message: String? = nil, entryId: String? = nil, userMessageIndex: Int? = nil) async {

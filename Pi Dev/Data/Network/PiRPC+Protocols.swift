@@ -13,7 +13,7 @@ protocol FilesBrowserP: AnyObject {
 /// Stores should depend on `PiRPCP` so `PiRPCClient` can be replaced with a mock
 /// in previews and tests without changing call sites.
 protocol PiRPCP: FilesBrowserP {
-  func prompt(message: String, repo: String?) async throws -> RPCResponse<PromptResponse>
+  func prompt(message: String, repo: String?, dir: String?) async throws -> RPCResponse<PromptResponse>
   func rerun(message: String?, entryId: String?) async throws -> String?
   func steer(message: String) async throws -> RPCResponse<EmptyResponse>
   func abort() async throws -> RPCResponse<EmptyResponse>
@@ -33,6 +33,7 @@ protocol PiRPCP: FilesBrowserP {
   func streamEvents(
     forPrompt promptText: String,
     repo: String?,
+    dir: String?,
     onEntryId: (@MainActor (String?) -> Void)?
   ) -> AsyncStream<AgentEvent>
   func streamRerunEvents(
