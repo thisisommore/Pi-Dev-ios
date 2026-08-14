@@ -33,7 +33,6 @@ final class ChatMessagesCVLayout: UICollectionViewLayout {
   static let defaultSpaceBetween: CGFloat = 10
   static let groupedSenderSpaceBetween: CGFloat = 4
   private var cachedAttributes: [UICollectionViewLayoutAttributes] = []
-  private var firstPrepare = true
   private var height: CGFloat = 0
   var newIndexForBackUpPoint = 0
   private(set) var prevIndexForBackUpPoint = 0
@@ -75,11 +74,6 @@ final class ChatMessagesCVLayout: UICollectionViewLayout {
       if attributes.frame.intersects(collectionView.bounds) {
         prevIndexForBackUpPoint = index
       }
-    }
-    if firstPrepare {
-      firstPrepare = false
-      let last = IndexPath(item: noOfItems - 1, section: 0)
-      collectionView.scrollToItem(at: last, at: .bottom, animated: false)
     }
     delegate.prepareDone()
   }

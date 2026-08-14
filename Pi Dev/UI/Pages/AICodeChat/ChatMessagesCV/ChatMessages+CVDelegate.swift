@@ -32,7 +32,7 @@ extension ChatMessagesVC: UICollectionViewDataSource {
 extension ChatMessagesVC: UICollectionViewDelegate {
   func scrollViewDidScroll(_ scrollView: UIScrollView) {
     let distFromBottom = distanceFromBottom(minY: scrollView.contentOffset.y, viewSize: scrollView.bounds.height, contentSize: scrollView.contentSize.height)
-    isNearBottom = distFromBottom < 1
+    isNearBottom = distFromBottom < 80
     let shouldShowButton = distFromBottom > 60
     let shouldHideButton = !shouldShowButton || tempButtonDisable
     if scrollToBottomButton.isHidden != shouldHideButton {

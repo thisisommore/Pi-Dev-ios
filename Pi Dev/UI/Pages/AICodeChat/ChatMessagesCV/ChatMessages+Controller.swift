@@ -3,12 +3,12 @@
 //  Pi Dev
 //
 
+import Observation
 import SwiftUI
 import UIKit
 
 final class ChatMessagesVC: UIViewController {
   var store: ChatStore
-  private var observationTask: Task<Void, Never>?
   var items: [ChatCVItem] = []
   var itemsCountForLayout: Int { self.items.count }
 
@@ -19,7 +19,6 @@ final class ChatMessagesVC: UIViewController {
   private var pendingKeepEditVisible = false
   private var lastMeasuredWidth: CGFloat = 0
   var heightCache: [UUID: (signature: Int, height: CGFloat)] = [:]
-  private var lastAppliedToolGroups: Set<UUID> = []
   private var headerHost: UIHostingController<Header>?
   private var headerTopConstraint: NSLayoutConstraint?
   private var statusBarBlurHeight: NSLayoutConstraint?
@@ -132,29 +131,21 @@ final class ChatMessagesVC: UIViewController {
   }
 
   func startObservation() {
-    self.observationTask = Task { @MainActor [weak self] in
-      guard let self else { return }
-      var lastCount = self.store.messages.count
-      var lastTyping = self.store.isResponding
-      var lastText: String? = self.store.messages.last?.text
-      var lastStreaming = self.store.messages.last?.isStreaming
-      var lastGenerating = self.store.generatingMessageId
-      while !Task.isCancelled {
-        try? await Task.sleep(for: .milliseconds(100))
-        let count = self.store.messages.count
-        let typing = self.store.isResponding
-        let currentLastText = self.store.messages.last?.text
-        let streaming = self.store.messages.last?.isStreaming
-        let generating = self.store.generatingMessageId
-        if count != lastCount || typing != lastTyping || currentLastText != lastText
-          || streaming != lastStreaming || generating != lastGenerating {
-          lastCount = count
-          lastTyping = typing
-          lastText = currentLastText
-          lastStreaming = streaming
-          lastGenerating = generating
-          self.applySnapshot(animated: true)
-        }
+    self.registerStoreObservation()
+  }
+
+  private func registerStoreObservation() {
+    withObservationTracking {
+      _ = self.store.messages
+      _ = self.store.isResponding
+      _ = self.store.generatingMessageId
+      _ = self.store.expandedToolGroups
+      _ = self.store.editingMessageId
+    } onChange: { [weak self] in
+      DispatchQueue.main.async {
+        guard let self else { return }
+        self.syncList()
+        self.registerStoreObservation()
       }
     }
   }
@@ -184,49 +175,17 @@ final class ChatMessagesVC: UIViewController {
   }
 
   deinit {
-    observationTask?.cancel()
     NotificationCenter.default.removeObserver(self)
   }
 
   func syncList() {
     self.markEditingMessageIfNeeded()
-    let newItems: [ChatCVItem] = store.messages.map { .message($0.id) } + (store.isResponding ? [.typing] : [])
-    if newItems != items {
-      self.lastAppliedToolGroups = self.store.expandedToolGroups
-      self.applySnapshot(animated: true)
-      return
-    }
-    if self.store.expandedToolGroups != self.lastAppliedToolGroups {
-      self.lastAppliedToolGroups = self.store.expandedToolGroups
-      self.relayoutHeightsForExpandedTools()
-    }
+    self.applySnapshot(animated: true)
   }
 
-  private func relayoutHeightsForExpandedTools() {
-    for item in self.items {
-      guard case .message(let id) = item,
-            let message = self.store.messages.first(where: { $0.id == id })
-      else { continue }
-      let signature = self.contentSignature(for: message)
-      if self.heightCache[id]?.signature != signature {
-        self.heightCache.removeValue(forKey: id)
-      }
-    }
-    let pinnedOffset = self.cv.contentOffset
-    UIView.performWithoutAnimation {
-      CATransaction.begin()
-      CATransaction.setDisableActions(true)
-      self.cv.collectionViewLayout.invalidateLayout()
-      self.cv.layoutIfNeeded()
-      self.cv.setContentOffset(pinnedOffset, animated: false)
-      CATransaction.commit()
-    }
-  }
-
-  func applySnapshot(animated: Bool, pinToBottom: Bool = true) {
+  func applySnapshot(animated _: Bool, pinToBottom: Bool = true) {
     let newItems: [ChatCVItem] = store.messages.map { .message($0.id) } + (store.isResponding ? [.typing] : [])
-    let wasNearBottom = isNearBottom
-    let shouldAnimate = animated && !store.isStreaming
+    let wasNearBottom = isNearBottom && !cv.isDragging && !cv.isTracking
     let relayout = {
       if newItems != self.items {
         self.items = newItems
@@ -237,23 +196,22 @@ final class ChatMessagesVC: UIViewController {
         self.cv.layoutIfNeeded()
       }
     }
-    if shouldAnimate {
+    UIView.performWithoutAnimation {
+      CATransaction.begin()
+      CATransaction.setDisableActions(true)
       relayout()
-    } else {
-      UIView.performWithoutAnimation(relayout)
-    }
-    if pinToBottom, wasNearBottom, let last = newItems.last {
-      DispatchQueue.main.async {
-        self.scrollToItem(last, animated: shouldAnimate)
+      if pinToBottom, wasNearBottom, !newItems.isEmpty {
+        self.pinContentToBottom()
       }
+      CATransaction.commit()
     }
   }
 
-  private func scrollToItem(_ item: ChatCVItem, animated: Bool) {
-    guard let index = items.firstIndex(of: item) else { return }
-    let indexPath = IndexPath(item: index, section: 0)
-    guard indexPath.item < cv.numberOfItems(inSection: 0) else { return }
-    cv.scrollToItem(at: indexPath, at: .bottom, animated: animated)
+  private func pinContentToBottom() {
+    let inset = cv.adjustedContentInset
+    let maxY = max(-inset.top, cv.contentSize.height + inset.bottom - cv.bounds.height)
+    cv.setContentOffset(CGPoint(x: cv.contentOffset.x, y: maxY), animated: false)
+    isNearBottom = true
   }
 
   @objc private func scrollToBottomTapped() {

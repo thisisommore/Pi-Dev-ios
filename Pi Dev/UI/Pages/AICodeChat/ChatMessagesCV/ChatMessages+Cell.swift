@@ -22,9 +22,4 @@ final class HostingCell: UICollectionViewCell {
     -> UICollectionViewLayoutAttributes {
     layoutAttributes
   }
-
-  override func prepareForReuse() {
-    super.prepareForReuse()
-    contentConfiguration = nil
-  }
 }

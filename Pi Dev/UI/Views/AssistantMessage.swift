@@ -133,12 +133,12 @@ struct AssistantMessage: View {
       if line.hasPrefix("```") {
         insideCodeFence.toggle()
         // Render fence line itself as paragraph (preserves original inline behavior)
-        blocks.append(.paragraph(id: UUID(), attributed: inlineAttributed(line)))
+        blocks.append(.paragraph(id: i, attributed: inlineAttributed(line)))
         i += 1
         continue
       }
       if insideCodeFence {
-        blocks.append(.paragraph(id: UUID(), attributed: inlineAttributed(line)))
+        blocks.append(.paragraph(id: i, attributed: inlineAttributed(line)))
         i += 1
         continue
       }
@@ -157,7 +157,7 @@ struct AssistantMessage: View {
           j += 1
         }
         if !headers.isEmpty {
-          let table = MarkdownTable(headers: headers, alignments: alignments, rows: rows)
+          let table = MarkdownTable(id: i, headers: headers, alignments: alignments, rows: rows)
           blocks.append(.table(table))
           i = j
           continue
@@ -175,9 +175,9 @@ struct AssistantMessage: View {
       }
       let attributed = inlineAttributed(lineText, headingLevel: headingLevel)
       if headingLevel > 0 {
-        blocks.append(.heading(id: UUID(), level: headingLevel, attributed: attributed))
+        blocks.append(.heading(id: i, level: headingLevel, attributed: attributed))
       } else {
-        blocks.append(.paragraph(id: UUID(), attributed: attributed))
+        blocks.append(.paragraph(id: i, attributed: attributed))
       }
       i += 1
     }
@@ -307,22 +307,22 @@ private enum TableAlignment {
 }
 
 private struct MarkdownTable: Identifiable {
-  let id = UUID()
+  let id: Int
   let headers: [String]
   let alignments: [TableAlignment]
   let rows: [[String]]
 }
 
 private enum MarkdownBlock: Identifiable {
-  case paragraph(id: UUID, attributed: AttributedString)
-  case heading(id: UUID, level: Int, attributed: AttributedString)
+  case paragraph(id: Int, attributed: AttributedString)
+  case heading(id: Int, level: Int, attributed: AttributedString)
   case table(MarkdownTable)
 
-  var id: UUID {
+  var id: String {
     switch self {
-    case .paragraph(let id, _): return id
-    case .heading(let id, _, _): return id
-    case .table(let t): return t.id
+    case .paragraph(let id, _): return "p-\(id)"
+    case .heading(let id, _, _): return "h-\(id)"
+    case .table(let t): return "t-\(t.id)"
     }
   }
 }
