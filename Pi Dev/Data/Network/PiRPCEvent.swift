@@ -177,7 +177,7 @@ struct AgentMessage: Decodable, Sendable {
       case "thinking":
         let thinking = try ThinkingBlock(from: decoder)
         self = .thinking(thinking.thinking)
-      case "toolCall":
+      case "toolCall", "tool_call":
         self = .toolCall(try AgentToolCall(from: decoder))
       default:
         self = .unknown(type: type)
@@ -198,6 +198,28 @@ struct AgentToolCall: Decodable, Sendable {
   let id: String?
   let name: String
   let arguments: [String: AnyCodable]?
+
+  private enum CodingKeys: String, CodingKey {
+    case id, name, arguments
+    case toolCallId, toolName, args
+  }
+
+  init(id: String?, name: String, arguments: [String: AnyCodable]?) {
+    self.id = id
+    self.name = name
+    self.arguments = arguments
+  }
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    id = try container.decodeIfPresent(String.self, forKey: .id)
+      ?? container.decodeIfPresent(String.self, forKey: .toolCallId)
+    name = try container.decodeIfPresent(String.self, forKey: .name)
+      ?? container.decodeIfPresent(String.self, forKey: .toolName)
+      ?? ""
+    arguments = try container.decodeIfPresent([String: AnyCodable].self, forKey: .arguments)
+      ?? container.decodeIfPresent([String: AnyCodable].self, forKey: .args)
+  }
 }
 
 struct AgentToolResult: Decodable, Sendable {
@@ -351,10 +373,11 @@ extension AssistantDelta {
     case "thinking_start": self = .thinkingStart(contentIndex: index)
     case "thinking_delta": self = .thinkingDelta(contentIndex: index, delta: json["delta"] as? String ?? "")
     case "thinking_end": self = .thinkingEnd(contentIndex: index, content: json["content"] as? String ?? "")
-    case "toolcall_start": self = .toolCallStart(contentIndex: index)
-    case "toolcall_delta": self = .toolCallDelta(contentIndex: index, delta: json["delta"] as? String ?? "")
-    case "toolcall_end":
-      let call = (json["toolCall"] as? [String: Any]).flatMap { try? AgentToolCall.decode(from: $0) }
+    case "toolcall_start", "tool_call_start": self = .toolCallStart(contentIndex: index)
+    case "toolcall_delta", "tool_call_delta": self = .toolCallDelta(contentIndex: index, delta: json["delta"] as? String ?? "")
+    case "toolcall_end", "tool_call_end":
+      let raw = (json["toolCall"] as? [String: Any]) ?? (json["tool_call"] as? [String: Any])
+      let call = raw.flatMap { try? AgentToolCall.decode(from: $0) }
       self = .toolCallEnd(contentIndex: index, toolCall: call ?? AgentToolCall(id: nil, name: "", arguments: nil))
     case "done": self = .done(reason: json["reason"] as? String ?? "stop")
     case "error": self = .error(reason: json["reason"] as? String ?? "error")

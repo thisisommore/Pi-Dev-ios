@@ -36,7 +36,9 @@ struct AssistantMessage: View {
       switch segment {
       case .text(let id, let text):
         flushActivity()
-        sections.append(.text(id: id, text: text))
+        if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+          sections.append(.text(id: id, text: text))
+        }
       case .tool(let tool):
         pending.append(.tool(tool))
       case .terminal(let run):
@@ -227,7 +229,8 @@ struct AssistantMessage: View {
           case .activity(let id, let items):
             ToolsDisclosure(
               items: items,
-              isExpanded: self.toolGroupBinding(id)
+              isExpanded: self.toolGroupBinding(id),
+              animated: !self.message.isStreaming
             )
             .padding(.top, 2)
             .padding(.bottom, 2)
@@ -238,7 +241,8 @@ struct AssistantMessage: View {
           ToolsDisclosure(
             tools: message.tools,
             terminal: message.terminal,
-            isExpanded: self.toolGroupBinding(message.id)
+            isExpanded: self.toolGroupBinding(message.id),
+            animated: !message.isStreaming
           )
           .padding(.top, message.thinking != nil ? 2 : 0)
         }
@@ -286,6 +290,11 @@ struct AssistantMessage: View {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(.horizontal, 12)
+    .transaction { transaction in
+      if message.isStreaming {
+        transaction.animation = nil
+      }
+    }
   }
 }
 

@@ -145,7 +145,8 @@ extension ChatStore {
           // Each agent turn gets its own assistant message, mirroring how
           // history loading maps one ChatMessage per assistant entry.
           let current = self.messages[currentIndex]
-          let hasContent = !current.text.isEmpty || current.thinking != nil || !current.tools.isEmpty || current.error != nil
+          let hasContent = !current.text.isEmpty || current.thinking != nil || !current.tools.isEmpty
+            || !current.segments.isEmpty || !current.terminal.isEmpty || current.error != nil
           if hasContent {
             updateMessage(at: currentIndex) { $0.isStreaming = false }
             withAnimation(.snappy) {
@@ -164,7 +165,8 @@ extension ChatStore {
       case .messageUpdate(_, let delta):
         switch delta {
         case .textDelta(_, let text):
-                    updateMessage(at: currentIndex) {
+          guard !text.isEmpty else { break }
+          updateMessage(at: currentIndex) {
             $0.text += text
             if let lastIndex = $0.segments.indices.last,
                case .text(let segmentId, let existing) = $0.segments[lastIndex] {
@@ -192,26 +194,14 @@ extension ChatStore {
         case .thinkingEnd:
           updateThinkingSeconds()
         case .toolCallEnd(_, let call):
-          let detail = formatToolDetail(name: call.name, arguments: call.arguments)
-          updateMessage(at: currentIndex) {
-            let tool = ToolUse(
-              kind: toolKind(for: call.name),
-              name: call.name,
-              detail: detail,
-              symbol: toolSymbol(for: call.name),
-              callId: call.id
-            )
-            $0.tools.append(tool)
-            $0.segments.append(.tool(tool))
-          }
-          if let id = call.id {
-            latestToolNames[id] = call.name
-            if let cmd = call.arguments?["command"]?.value as? String, !cmd.isEmpty {
-              latestToolCommands[id] = cmd
-            } else if !detail.isEmpty {
-              latestToolCommands[id] = detail
-            }
-          }
+          appendTool(
+            name: call.name,
+            callId: call.id,
+            arguments: call.arguments,
+            at: currentIndex,
+            latestToolNames: &latestToolNames,
+            latestToolCommands: &latestToolCommands
+          )
         case .error(let reason):
           if stopRequested && isAbortError(reason) {
             break
@@ -220,6 +210,17 @@ extension ChatStore {
         default:
           break
         }
+
+      case .toolExecutionStart(let toolCallId, let toolName, let args):
+        let mapped = Dictionary(uniqueKeysWithValues: args.map { ($0.key, AnyCodable(value: $0.value)) })
+        appendTool(
+          name: toolName,
+          callId: toolCallId.isEmpty ? nil : toolCallId,
+          arguments: mapped.isEmpty ? nil : mapped,
+          at: currentIndex,
+          latestToolNames: &latestToolNames,
+          latestToolCommands: &latestToolCommands
+        )
 
       case .toolExecutionEnd(let toolCallId, let toolName, let result, let isError):
         let name = latestToolNames[toolCallId] ?? toolName
@@ -326,6 +327,45 @@ extension ChatStore {
     processQueue()
   }
 
+  private func appendTool(
+    name: String,
+    callId: String?,
+    arguments: [String: AnyCodable]?,
+    at index: Int,
+    latestToolNames: inout [String: String],
+    latestToolCommands: inout [String: String]
+  ) {
+    guard !name.isEmpty else { return }
+    let detail = formatToolDetail(name: name, arguments: arguments)
+    if let id = callId, !id.isEmpty {
+      latestToolNames[id] = name
+      if let cmd = arguments?["command"]?.value as? String, !cmd.isEmpty {
+        latestToolCommands[id] = cmd
+      } else if !detail.isEmpty {
+        latestToolCommands[id] = detail
+      }
+    }
+    updateMessage(at: index) { message in
+      if let callId, !callId.isEmpty {
+        let already = message.tools.contains { $0.callId == callId }
+          || message.segments.contains { segment in
+            if case .tool(let tool) = segment { return tool.callId == callId }
+            return false
+          }
+        guard !already else { return }
+      }
+      let tool = ToolUse(
+        kind: toolKind(for: name),
+        name: name,
+        detail: detail,
+        symbol: toolSymbol(for: name),
+        callId: callId
+      )
+      message.tools.append(tool)
+      message.segments.append(.tool(tool))
+    }
+  }
+
   func updateMessage(at index: Int, _ update: (inout ChatMessage) -> Void) {
     guard self.messages.indices.contains(index) else {
       return
@@ -349,16 +389,37 @@ extension ChatStore {
       }
       return rawErrorText
     }()
-    updateMessage(at: index) { message in
+    updateMessage(at: index) { current in
       if let built {
-        message.segments = built.segments
-        message.text = built.text
-        message.code = built.code
+        var segments = built.segments
+        var leftoverTerminal = current.terminal
+        if !leftoverTerminal.isEmpty {
+          segments = segments.map { segment in
+            if case .tool(let tool) = segment,
+               tool.name.lowercased().contains("bash"),
+               !leftoverTerminal.isEmpty {
+              return .terminal(leftoverTerminal.removeFirst())
+            }
+            return segment
+          }
+          segments.append(contentsOf: leftoverTerminal.map { .terminal($0) })
+        }
+        current.segments = segments
+        current.text = built.text
+        current.code = built.code
+        current.tools = segments.compactMap {
+          if case .tool(let tool) = $0 { return tool }
+          return nil
+        }
+        current.terminal = segments.compactMap {
+          if case .terminal(let run) = $0 { return run }
+          return nil
+        }
       }
-      message.isStreaming = false
-      message.tokens = tokenCount
+      current.isStreaming = false
+      current.tokens = tokenCount
       if let errorText {
-        message.error = errorText
+        current.error = errorText
       }
     }
     self.usedTokens += tokenCount

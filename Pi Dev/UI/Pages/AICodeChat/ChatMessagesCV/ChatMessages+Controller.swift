@@ -183,6 +183,8 @@ final class ChatMessagesVC: UIViewController {
     self.applySnapshot(animated: true)
   }
 
+  private var lastStreamStructure = 0
+
   func applySnapshot(animated _: Bool, pinToBottom: Bool = true) {
     let newItems: [ChatCVItem] = store.messages.map { .message($0.id) } + (store.isResponding ? [.typing] : [])
     let wasNearBottom = isNearBottom && !cv.isDragging && !cv.isTracking
@@ -193,6 +195,7 @@ final class ChatMessagesVC: UIViewController {
         self.cv.layoutIfNeeded()
       } else {
         self.cv.collectionViewLayout.invalidateLayout()
+        self.reconfigureStreamingCellIfNeeded()
         self.cv.layoutIfNeeded()
       }
     }
@@ -205,6 +208,25 @@ final class ChatMessagesVC: UIViewController {
       }
       CATransaction.commit()
     }
+  }
+
+  private func reconfigureStreamingCellIfNeeded() {
+    guard let last = store.messages.last else { return }
+    var hasher = Hasher()
+    hasher.combine(last.id)
+    hasher.combine(last.tools.count)
+    hasher.combine(last.segments.count)
+    hasher.combine(last.terminal.count)
+    hasher.combine(last.thinking != nil)
+    hasher.combine(last.error != nil)
+    hasher.combine(last.isStreaming)
+    let signature = hasher.finalize()
+    guard signature != lastStreamStructure else { return }
+    lastStreamStructure = signature
+    guard let index = items.firstIndex(of: .message(last.id)) else { return }
+    let indexPath = IndexPath(item: index, section: 0)
+    guard let cell = cv.cellForItem(at: indexPath) as? HostingCell else { return }
+    cell.hostSwiftUI(MessageRow(store: store, messageId: last.id), width: cv.cvAvailableWidth())
   }
 
   private func pinContentToBottom() {
@@ -362,6 +384,7 @@ final class ChatMessagesVC: UIViewController {
     hasher.combine(message.thinking?.full.count ?? 0)
     hasher.combine(message.thinking?.summary.count ?? 0)
     hasher.combine(message.tools.count)
+    hasher.combine(message.terminal.count)
     hasher.combine(message.segments.count)
     hasher.combine(message.error != nil)
     hasher.combine(message.isStreaming)

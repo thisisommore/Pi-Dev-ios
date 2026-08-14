@@ -21,15 +21,18 @@ struct ToolsDisclosure: View {
   }
 
   let items: [Item]
+  var animated: Bool = true
   @Binding var isExpanded: Bool
 
-  init(items: [Item], isExpanded: Binding<Bool>) {
+  init(items: [Item], isExpanded: Binding<Bool>, animated: Bool = true) {
     self.items = items
+    self.animated = animated
     self._isExpanded = isExpanded
   }
 
-  init(tools: [ToolUse], terminal: [TerminalRun] = [], isExpanded: Binding<Bool>) {
+  init(tools: [ToolUse], terminal: [TerminalRun] = [], isExpanded: Binding<Bool>, animated: Bool = true) {
     self.items = tools.map { .tool($0) } + terminal.map { .terminal($0) }
+    self.animated = animated
     self._isExpanded = isExpanded
   }
 
@@ -89,11 +92,10 @@ struct ToolsDisclosure: View {
               }
             }
             .padding(.leading, 4)
-            .transition(.opacity)
+            .transition(self.animated ? .opacity : .identity)
           }
         }
-        .clipped()
-        .animation(.snappy, value: self.isExpanded)
+        .animation(self.animated ? .snappy : nil, value: self.isExpanded)
       }
     }
   }
