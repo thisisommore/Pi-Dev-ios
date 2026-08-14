@@ -46,6 +46,7 @@ struct ContentView: View {
                     .lineLimit(1)
                     .padding(.leading, isSidebarVisible ? 16 : 110)
                     .padding(.trailing, 140)
+                    .padding(.top, 14)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .frame(height: 52, alignment: .leading)
                     .offset(y: -52)
