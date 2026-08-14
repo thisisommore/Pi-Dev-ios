@@ -11,7 +11,6 @@ struct ContentView: View {
     @State private var sidebarWidth: CGFloat = 280
     @State private var isSidebarVisible = true
     @State private var changesSidebarWidth: CGFloat = 280
-    @Environment(\.colorScheme) private var colorScheme
 
     private let sidebarMin: CGFloat = 220
     private let sidebarMax: CGFloat = 360
@@ -40,9 +39,21 @@ struct ContentView: View {
                 ChatDetailView(store: store, isSidebarVisible: $isSidebarVisible)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .overlay(alignment: .topLeading) {
+                Text(store.selectedSession?.title ?? "Pi Dev")
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(appLabel)
+                    .lineLimit(1)
+                    .padding(.leading, isSidebarVisible ? 16 : 110)
+                    .padding(.trailing, 140)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(height: 52, alignment: .leading)
+                    .offset(y: -52)
+                    .allowsHitTesting(false)
+            }
             .background {
                 Rectangle()
-                    .fill(Color(nsColor: .textBackgroundColor))
+                    .fill(appCanvas)
                     .ignoresSafeArea()
             }
 
@@ -66,6 +77,11 @@ struct ContentView: View {
         .frame(minWidth: 800, minHeight: 500)
         .fullBleedWindowChrome()
         .background(ChangesSidebarTitlebarButton(store: store))
+        .sheet(isPresented: $store.showFolderPicker) {
+            FolderPickerSheet { path in
+                store.setWorkingDir(path)
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .newChatRequested)) { _ in
             store.newChat()
         }
@@ -76,7 +92,7 @@ struct ContentView: View {
             width: $sidebarWidth,
             minWidth: sidebarMin,
             maxWidth: sidebarMax,
-            lineWhite: colorScheme == .dark ? 0.20 : 0.86
+            lineWhite: 0
         )
         .frame(width: 8)
         .frame(maxHeight: .infinity)
@@ -89,7 +105,7 @@ struct ContentView: View {
             width: $changesSidebarWidth,
             minWidth: changesSidebarMin,
             maxWidth: changesSidebarMax,
-            lineWhite: colorScheme == .dark ? 0.20 : 0.86,
+            lineWhite: 0,
             isRightSide: true,
             inverted: true
         )
@@ -104,7 +120,7 @@ struct ContentView: View {
 private struct SidebarBackground: View {
     var body: some View {
         Rectangle()
-            .fill(Color(nsColor: .controlBackgroundColor))
+            .fill(appSidebar)
             .ignoresSafeArea()
     }
 }

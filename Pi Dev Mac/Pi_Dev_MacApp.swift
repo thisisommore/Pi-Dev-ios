@@ -27,7 +27,7 @@ struct Pi_Dev_MacApp: App {
         Settings {
             Form {
                 Section("Appearance") {
-                    Text("Pi Dev Mac uses system light/dark appearance.")
+                    Text("Pi Dev Mac follows system light and dark appearance.")
                         .foregroundStyle(.secondary)
                 }
             }

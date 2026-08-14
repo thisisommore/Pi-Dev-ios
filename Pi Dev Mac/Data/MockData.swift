@@ -13,6 +13,7 @@ enum MockData {
             updatedAt: Date().addingTimeInterval(-60 * 12),
             messages: privacyChat,
             projectName: "circuit",
+            workingDir: "/Users/preview/Documents/Projects/circuit",
             fileChanges: privacyChanges
         ),
         ChatSession(
@@ -144,6 +145,22 @@ enum MockData {
                         }
                     }
                     """
+                )
+            ],
+            thinking: Thinking(
+                summary: "Weighed KVAC vs BBS+ for a two-party mint/gate — KVAC wins on amount math and no pairings.",
+                full: "The user asked whether KVAC is better than BBS+ when Mint and Gate already share a key. KVAC is purpose-built for that. Amount hiding via Pedersen + Bulletproofs is native. BBS+ only wins with a third-party verifier."
+            ),
+            tools: [
+                ToolUse(name: "bash", detail: "command: git log -1 --format=\"%H%n%s\""),
+                ToolUse(name: "Search for .swift", detail: "Found CredentialBalance.swift, TokenSigner.swift"),
+                ToolUse(name: "Edit CredentialBalance.swift", detail: "+31 −12"),
+                ToolUse(name: "Read CredentialBalance.swift", detail: "Sources/Crypto/KVAC/CredentialBalance.swift")
+            ],
+            terminal: [
+                TerminalRun(
+                    command: "git log -1 --format=\"%H%n%s\"",
+                    output: "a1b2c3d4e5f6789012345678901234567890abcd\nFix parser edge case for nested blocks"
                 )
             ],
             createdAt: Date().addingTimeInterval(-60 * 12)

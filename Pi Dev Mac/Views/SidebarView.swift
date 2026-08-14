@@ -11,7 +11,7 @@ struct SidebarView: View {
 
     /// Subtle gray selection (not system accent blue).
     private var selectionFill: Color {
-        Color(nsColor: .unemphasizedSelectedContentBackgroundColor)
+        Color.primary.opacity(0.08)
     }
 
     var body: some View {
@@ -84,7 +84,7 @@ struct SidebarView: View {
                                 .padding(.top, 10)
                                 .padding(.bottom, 0)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(Color(nsColor: .controlBackgroundColor))
+                                .background(appSidebar)
                         }
                     }
                 } else {
@@ -99,7 +99,7 @@ struct SidebarView: View {
                             .padding(.top, 10)
                             .padding(.bottom, 4)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color(nsColor: .controlBackgroundColor))
+                            .background(appSidebar)
                     }
                 }
             }
@@ -309,5 +309,5 @@ private extension NSView {
 #Preview {
     SidebarView(store: ChatStore())
         .frame(width: 280, height: 640)
-        .background(Color(nsColor: .controlBackgroundColor))
+        .background(Color(nsColor: MacTheme.sidebar))
 }

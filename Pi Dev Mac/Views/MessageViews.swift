@@ -3,11 +3,13 @@
 //  Pi Dev Mac
 //
 
+import AppKit
 import SwiftUI
 
 // MARK: - Message list
 
 struct MessageListView: View {
+    @Bindable var store: ChatStore
     let messages: [ChatMessage]
 
     var body: some View {
@@ -15,12 +17,13 @@ struct MessageListView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 22) {
                     ForEach(messages) { message in
-                        MessageRowView(message: message)
+                        MessageRowView(message: message, store: store)
                             .id(message.id)
                     }
                 }
                 .padding(.horizontal, 28)
-                .padding(.vertical, 24)
+                .padding(.top, 12)
+                .padding(.bottom, 24)
                 .frame(maxWidth: 820)
                 .frame(maxWidth: .infinity)
             }
@@ -42,13 +45,14 @@ struct MessageListView: View {
 
 struct MessageRowView: View {
     let message: ChatMessage
+    @Bindable var store: ChatStore
 
     var body: some View {
         switch message.role {
         case .user:
             UserMessageView(message: message)
         case .assistant:
-            AssistantMessageView(message: message)
+            AssistantMessageView(message: message, store: store)
         }
     }
 }
@@ -63,18 +67,11 @@ struct UserMessageView: View {
             Spacer(minLength: 80)
             Text(message.text)
                 .font(.body)
-                .foregroundStyle(.primary)
+                .foregroundStyle(appOnInk)
                 .textSelection(.enabled)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(Color.accentColor.opacity(0.12))
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(Color.accentColor.opacity(0.18), lineWidth: 1)
-                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 11)
+                .background(appColor, in: .rect(cornerRadius: 22))
         }
     }
 }
@@ -83,9 +80,21 @@ struct UserMessageView: View {
 
 struct AssistantMessageView: View {
     let message: ChatMessage
+    @Bindable var store: ChatStore
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
+            if let thinking = message.thinking {
+                ThinkingBlock(thinking: thinking)
+            }
+
+            if !message.toolActivities.isEmpty {
+                ToolsDisclosure(
+                    items: message.toolActivities,
+                    isExpanded: toolGroupBinding
+                )
+            }
+
             MarkdownishText(text: message.text)
                 .font(.body)
                 .foregroundStyle(.primary)
@@ -99,6 +108,13 @@ struct AssistantMessageView: View {
             messageActions
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var toolGroupBinding: Binding<Bool> {
+        Binding(
+            get: { store.isToolGroupExpanded(message.id) },
+            set: { store.setToolGroup(message.id, expanded: $0) }
+        )
     }
 
     private var messageActions: some View {
@@ -261,7 +277,7 @@ struct CodeBlockView: View {
         }
         .background {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.primary.opacity(0.035))
+                .fill(Color.primary.opacity(0.04))
         }
         .overlay {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -279,6 +295,6 @@ struct CodeBlockView: View {
 }
 
 #Preview {
-    MessageListView(messages: MockData.sessions[0].messages)
+    MessageListView(store: ChatStore(), messages: MockData.sessions[0].messages)
         .frame(width: 720, height: 500)
 }

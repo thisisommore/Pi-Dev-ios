@@ -13,6 +13,11 @@ struct ComposerView: View {
         !store.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    private var folderLabel: String? {
+        guard let path = store.selectedSession?.workingDir, !path.isEmpty else { return nil }
+        return (path as NSString).lastPathComponent
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             composerCard
@@ -32,13 +37,26 @@ struct ComposerView: View {
 
     private var composerCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            TextField("Do anything…", text: $store.draft, axis: .vertical)
+            if let folderLabel {
+                HStack(spacing: 6) {
+                    Image(systemName: "folder.fill")
+                        .font(.system(size: 11, weight: .semibold))
+                    Text(folderLabel)
+                        .font(.caption.weight(.semibold))
+                        .lineLimit(1)
+                }
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(.secondary.opacity(0.12), in: .capsule)
+            }
+
+            TextField("Ask about your code…", text: $store.draft, axis: .vertical)
                 .textFieldStyle(.plain)
                 .font(.body)
                 .lineLimit(1...8)
                 .focused($focused)
                 .onSubmit {
-                    // Return sends on macOS when not holding option; shift-return can still expand via axis.
                     if canSend { store.sendDraft() }
                 }
 
@@ -51,13 +69,11 @@ struct ComposerView: View {
             }
         }
         .padding(.horizontal, 14)
-        .padding(.top, 10)
-        .padding(.bottom, 6)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
         .background {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(.background)
-                .shadow(color: .black.opacity(0.06), radius: 12, y: 4)
-                .shadow(color: .black.opacity(0.03), radius: 1, y: 0)
+                .fill(Color.primary.opacity(0.04))
         }
         .overlay {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -67,13 +83,17 @@ struct ComposerView: View {
 
     private var attachButton: some View {
         Menu {
-            Button("Attach file…") {}
-            Button("Add folder…") {}
+            Button("Attachment") {}
+            Button {
+                store.showFolderPicker = true
+            } label: {
+                Label("Folder", systemImage: "folder")
+            }
         } label: {
             Image(systemName: "plus")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .frame(width: 28, height: 28)
+                .foregroundStyle(appLabel)
+                .frame(width: 32, height: 32)
                 .contentShape(Rectangle())
         }
         .menuStyle(.borderlessButton)
@@ -100,12 +120,8 @@ struct ComposerView: View {
                 }
             }
         } label: {
-            Text(store.selectedModel.name)
-                .font(.caption.weight(.medium))
+            PillLabel(symbol: nil, text: store.selectedModel.name)
                 .foregroundStyle(.secondary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .contentShape(Rectangle())
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
@@ -131,12 +147,8 @@ struct ComposerView: View {
                 }
             }
         } label: {
-            Text(store.selectedThinkingLevel.displayName)
-                .font(.caption.weight(.medium))
+            PillLabel(symbol: nil, text: store.selectedThinkingLevel.displayName)
                 .foregroundStyle(.secondary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .contentShape(Rectangle())
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
@@ -150,11 +162,11 @@ struct ComposerView: View {
         } label: {
             Image(systemName: "arrow.up")
                 .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(canSend ? .white : .secondary)
-                .frame(width: 28, height: 28)
+                .foregroundStyle(canSend ? appOnInk : .secondary)
+                .frame(width: 32, height: 32)
                 .background {
                     Circle()
-                        .fill(canSend ? Color.accentColor : Color.primary.opacity(0.08))
+                        .fill(canSend ? appColor : Color.primary.opacity(0.10))
                 }
         }
         .buttonStyle(.plain)

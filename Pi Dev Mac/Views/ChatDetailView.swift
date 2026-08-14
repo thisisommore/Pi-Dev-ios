@@ -15,9 +15,9 @@ struct ChatDetailView: View {
                 FileDiffView(change: change)
             } else if let session = store.selectedSession {
                 if session.messages.isEmpty {
-                    EmptyStateView(store: store, sessionTitle: session.title)
+                    EmptyStateView()
                 } else {
-                    MessageListView(messages: session.messages)
+                    MessageListView(store: store, messages: session.messages)
                 }
                 ComposerView(store: store)
             } else {
@@ -26,8 +26,8 @@ struct ChatDetailView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.clear)
-        .navigationTitle(store.selectedSession?.title ?? "Pi Dev")
-        .navigationSubtitle(subtitle)
+        .navigationTitle("")
+        .toolbarRole(.editor)
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .toolbar {
             ToolbarItem(placement: .navigation) {
@@ -42,24 +42,24 @@ struct ChatDetailView: View {
                 .help(isSidebarVisible ? "Hide sidebar" : "Show sidebar")
             }
 
-            ToolbarItem(placement: .cancellationAction) {
-                Text("Pi Dev")
-                    .font(.headline.weight(.semibold))
-                    .foregroundStyle(.primary)
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    store.showFolderPicker = true
+                } label: {
+                    Label("Open folder", systemImage: "folder")
+                }
+                .help("Open folder")
             }
-            .sharedBackgroundVisibility(.hidden)
 
+            ToolbarItem(placement: .primaryAction) {
+                ContextGauge(
+                    fraction: store.contextFraction,
+                    used: store.usedTokens,
+                    window: store.contextWindow
+                )
+                .frame(width: 28, height: 28)
+            }
         }
-    }
-
-    private var subtitle: String {
-        if let project = store.selectedSession?.projectName {
-            return project
-        }
-        if let count = store.selectedSession?.messages.count, count > 0 {
-            return "\(count) messages"
-        }
-        return " "
     }
 
     private var noSelection: some View {

@@ -15,7 +15,7 @@ struct FileDiffView: View {
             diffContent
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .textBackgroundColor))
+        .background(appCanvas)
     }
 
     private var header: some View {
@@ -28,9 +28,9 @@ struct FileDiffView: View {
 
             HStack(spacing: 4) {
                 Text("+\(change.additions)")
-                    .foregroundStyle(.green)
+                    .foregroundStyle(.primary)
                 Text("-\(change.deletions)")
-                    .foregroundStyle(.red)
+                    .foregroundStyle(.secondary)
             }
             .font(.caption.weight(.semibold))
             .monospacedDigit()
@@ -38,7 +38,7 @@ struct FileDiffView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(nsColor: .textBackgroundColor))
+        .background(appCanvas)
     }
 
     private var diffContent: some View {

@@ -18,6 +18,9 @@ struct ChatMessage: Identifiable, Hashable, Sendable {
     let role: MessageRole
     var text: String
     var codeBlocks: [CodeBlock]
+    var thinking: Thinking?
+    var tools: [ToolUse]
+    var terminal: [TerminalRun]
     var createdAt: Date
 
     init(
@@ -25,14 +28,67 @@ struct ChatMessage: Identifiable, Hashable, Sendable {
         role: MessageRole,
         text: String,
         codeBlocks: [CodeBlock] = [],
+        thinking: Thinking? = nil,
+        tools: [ToolUse] = [],
+        terminal: [TerminalRun] = [],
         createdAt: Date = .now
     ) {
         self.id = id
         self.role = role
         self.text = text
         self.codeBlocks = codeBlocks
+        self.thinking = thinking
+        self.tools = tools
+        self.terminal = terminal
         self.createdAt = createdAt
     }
+
+    var toolActivities: [ToolActivity] {
+        tools.map { .tool($0) } + terminal.map { .terminal($0) }
+    }
+}
+
+enum ToolActivity: Identifiable, Hashable, Sendable {
+    case tool(ToolUse)
+    case terminal(TerminalRun)
+
+    var id: UUID {
+        switch self {
+        case .tool(let tool): return tool.id
+        case .terminal(let run): return run.id
+        }
+    }
+}
+
+struct ToolUse: Identifiable, Hashable, Sendable {
+    let id: UUID
+    var name: String
+    var detail: String
+
+    init(id: UUID = UUID(), name: String, detail: String) {
+        self.id = id
+        self.name = name
+        self.detail = detail
+    }
+}
+
+struct TerminalRun: Identifiable, Hashable, Sendable {
+    let id: UUID
+    var command: String
+    var output: String
+    var exitCode: Int
+
+    init(id: UUID = UUID(), command: String, output: String, exitCode: Int = 0) {
+        self.id = id
+        self.command = command
+        self.output = output
+        self.exitCode = exitCode
+    }
+}
+
+struct Thinking: Hashable, Sendable {
+    var summary: String
+    var full: String
 }
 
 struct CodeBlock: Identifiable, Hashable, Sendable {
@@ -84,6 +140,7 @@ struct ChatSession: Identifiable, Hashable, Sendable {
     var updatedAt: Date
     var messages: [ChatMessage]
     var projectName: String?
+    var workingDir: String?
     var fileChanges: [FileChange]
 
     init(
@@ -93,6 +150,7 @@ struct ChatSession: Identifiable, Hashable, Sendable {
         updatedAt: Date = .now,
         messages: [ChatMessage] = [],
         projectName: String? = nil,
+        workingDir: String? = nil,
         fileChanges: [FileChange] = []
     ) {
         self.id = id
@@ -101,6 +159,7 @@ struct ChatSession: Identifiable, Hashable, Sendable {
         self.updatedAt = updatedAt
         self.messages = messages
         self.projectName = projectName
+        self.workingDir = workingDir
         self.fileChanges = fileChanges
     }
 
@@ -185,8 +244,8 @@ struct PromptSuggestion: Identifiable, Hashable, Sendable {
     }
 
     static let emptyState: [PromptSuggestion] = [
-        .init(title: "Explore and understand code", symbol: "magnifyingglass", tint: .blue),
-        .init(title: "Build a new feature, app, or tool", symbol: "hammer.fill", tint: .purple),
-        .init(title: "Review code and suggest changes", symbol: "checkmark.seal.fill", tint: .green)
+        .init(title: "Explore and understand code", symbol: "magnifyingglass", tint: .primary.opacity(0.55)),
+        .init(title: "Build a new feature, app, or tool", symbol: "hammer.fill", tint: .primary.opacity(0.55)),
+        .init(title: "Review code and suggest changes", symbol: "checkmark.seal.fill", tint: .primary.opacity(0.55))
     ]
 }

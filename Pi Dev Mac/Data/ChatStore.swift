@@ -18,6 +18,15 @@ final class ChatStore {
     var isComposerFocused: Bool = false
     var isChangesSidebarVisible: Bool = false
     var selectedChangeFileID: FileChange.ID? = nil
+    var showFolderPicker: Bool = false
+    var usedTokens: Int = 46_800
+    var contextWindow: Int = 200_000
+    var expandedToolGroups: Set<UUID> = []
+
+    var contextFraction: Double {
+        guard contextWindow > 0 else { return 0 }
+        return min(1, Double(usedTokens) / Double(contextWindow))
+    }
 
     init(sessions: [ChatSession] = MockData.sessions) {
         self.sessions = sessions
@@ -67,12 +76,14 @@ final class ChatStore {
 
     func newChat(in project: String? = nil) {
         let projectName = project ?? selectedSession?.projectName
+        let workingDir = selectedSession?.workingDir
         let session = ChatSession(
             title: "New chat",
             preview: "Start a conversation…",
             updatedAt: .now,
             messages: [],
-            projectName: projectName
+            projectName: projectName,
+            workingDir: workingDir
         )
         sessions.insert(session, at: 0)
         selectedSessionID = session.id
@@ -127,6 +138,24 @@ final class ChatStore {
         isComposerFocused = true
     }
 
+    func setWorkingDir(_ path: String) {
+        guard let id = selectedSessionID,
+              let index = sessions.firstIndex(where: { $0.id == id }) else { return }
+        sessions[index].workingDir = path
+    }
+
+    func isToolGroupExpanded(_ id: UUID) -> Bool {
+        expandedToolGroups.contains(id)
+    }
+
+    func setToolGroup(_ id: UUID, expanded: Bool) {
+        if expanded {
+            expandedToolGroups.insert(id)
+        } else {
+            expandedToolGroups.remove(id)
+        }
+    }
+
     // MARK: - Fake reply
 
     private func fakeAssistantReply(to prompt: String) -> ChatMessage {
@@ -139,6 +168,21 @@ final class ChatStore {
 
             In a real build this would stream from the model. For now, the layout, selection, and composer all work so you can poke at the interface.
             """,
+            thinking: Thinking(
+                summary: "Looked at the request and prepared a mock reply so the Mac UI can be reviewed.",
+                full: "This is fake thinking text for the Mac UI. No model ran."
+            ),
+            tools: [
+                ToolUse(name: "bash", detail: "command: ls -la"),
+                ToolUse(name: "Read ChatStore.swift", detail: "Pi Dev Mac/Data/ChatStore.swift"),
+                ToolUse(name: "Edit ComposerView.swift", detail: "+18 −4")
+            ],
+            terminal: [
+                TerminalRun(
+                    command: "ls -la",
+                    output: "total 48\ndrwxr-xr-x  12 om  staff   384 Aug 14 12:00 .\ndrwxr-xr-x   8 om  staff   256 Aug 14 11:40 .."
+                )
+            ],
             createdAt: .now.addingTimeInterval(0.5)
         )
     }

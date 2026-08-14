@@ -21,7 +21,7 @@ struct ChangesSidebarView: View {
     }
 
     private var selectionFill: Color {
-        Color(nsColor: .unemphasizedSelectedContentBackgroundColor)
+        Color.primary.opacity(0.08)
     }
 
     var body: some View {
@@ -41,16 +41,16 @@ struct ChangesSidebarView: View {
             Spacer(minLength: 0)
             HStack(spacing: 4) {
                 Text("+\(totalAdditions)")
-                    .foregroundStyle(.green)
+                    .foregroundStyle(.primary)
                 Text("-\(totalDeletions)")
-                    .foregroundStyle(.red)
+                    .foregroundStyle(.secondary)
             }
             .font(.caption.weight(.semibold))
             .monospacedDigit()
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(Color(nsColor: .controlBackgroundColor))
+        .background(appSidebar)
     }
 
     private var changesList: some View {
@@ -90,9 +90,9 @@ struct ChangesSidebarView: View {
 
                 HStack(spacing: 4) {
                     Text("+\(change.additions)")
-                        .foregroundStyle(.green)
+                        .foregroundStyle(.primary)
                     Text("-\(change.deletions)")
-                        .foregroundStyle(.red)
+                        .foregroundStyle(.secondary)
                 }
                 .font(.caption.weight(.medium))
                 .monospacedDigit()
@@ -113,5 +113,5 @@ struct ChangesSidebarView: View {
 #Preview {
     ChangesSidebarView(store: ChatStore())
         .frame(width: 260, height: 640)
-        .background(Color(nsColor: .controlBackgroundColor))
+        .background(appSidebar)
 }

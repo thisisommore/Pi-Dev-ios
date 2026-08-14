@@ -89,6 +89,11 @@ final class ResizeHandleView: NSView {
     /// Prevent the window from interpreting a press here as a window drag.
     override var mouseDownCanMoveWindow: Bool { false }
 
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        needsDisplay = true
+    }
+
     override func draw(_ dirtyRect: NSRect) {
         // Paint the entire 8 pt handle so no underlying content shows through.
         // Fill the left and right halves with the adjacent column colors, then
@@ -98,19 +103,19 @@ final class ResizeHandleView: NSView {
         let rightRect = NSRect(x: midX, y: 0, width: bounds.width - midX, height: bounds.height)
 
         if isRightSide {
-            NSColor.textBackgroundColor.setFill()
+            MacTheme.canvas.setFill()
             leftRect.fill()
-            NSColor.controlBackgroundColor.setFill()
+            MacTheme.sidebar.setFill()
             rightRect.fill()
         } else {
-            NSColor.controlBackgroundColor.setFill()
+            MacTheme.sidebar.setFill()
             leftRect.fill()
-            NSColor.textBackgroundColor.setFill()
+            MacTheme.canvas.setFill()
             rightRect.fill()
         }
 
         let lineRect = NSRect(x: midX - 0.5, y: 0, width: 1, height: bounds.height)
-        NSColor(white: lineWhite, alpha: 1.0).setFill()
+        MacTheme.divider.setFill()
         lineRect.fill()
     }
 
